@@ -1,0 +1,37 @@
+{
+  "cli": {
+    "version": ">= 5.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDck2gFCIzElvwf26NHouFsViqn8spQMbM",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "poshmedia-thehk.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "poshmedia-thehk",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "poshmedia-thehk.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "776152092965",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:776152092965:web:86af1b67f67f3ba6674acc"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDck2gFCIzElvwf26NHouFsViqn8spQMbM",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "poshmedia-thehk.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "poshmedia-thehk",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "poshmedia-thehk.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "776152092965",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:776152092965:web:86af1b67f67f3ba6674acc"
+      }
+    }
+  }
+}

@@ -1,6 +1,70 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
-  }
+    "strict": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ],
+      "@components": [
+        "src/components/index"
+      ],
+      "@components/*": [
+        "src/components/*"
+      ],
+      "@theme": [
+        "src/theme/index"
+      ],
+      "@theme/*": [
+        "src/theme/*"
+      ],
+      "@hooks/*": [
+        "src/hooks/*"
+      ],
+      "@stores/*": [
+        "src/stores/*"
+      ],
+      "@lib/*": [
+        "src/lib/*"
+      ],
+      "@types/*": [
+        "src/types/*"
+      ],
+      "@data/*": [
+        "src/data/*"
+      ],
+      "@features/*": [
+        "src/features/*"
+      ],
+      "@domain/*": [
+        "src/domain/*"
+      ],
+      "@repositories/*": [
+        "src/repositories/*"
+      ],
+      "@infrastructure/*": [
+        "src/infrastructure/*"
+      ],
+      "@config/*": [
+        "src/config/*"
+      ],
+      "@assets/*": [
+        "assets/*"
+      ]
+    }
+  },
+  "exclude": [
+    "node_modules",
+    "functions",
+    "android",
+    "ios"
+  ],
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
 }

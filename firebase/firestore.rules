@@ -1,0 +1,166 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isSeller() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['seller', 'admin'];
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      // Owners can update their own profile, but not privileged/server-only
+      // fields (role, verification status, referral identity).
+      allow update: if isAdmin() || (isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isVerified', 'referralCode', 'referredBy']));
+    }
+
+    match /wallets/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false; // Wallet mutations only via Cloud Functions
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if false; // Only Cloud Functions create financial records
+    }
+
+    match /withdrawals/{withdrawalId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create, update: if false; // Only Cloud Functions create/update payment records
+    }
+
+    match /ledgerEntries/{ledgerEntryId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create, update, delete: if false; // Only Cloud Functions create ledger entries
+    }
+
+    match /listings/{listingId} {
+      allow read: if true; // Public marketplace browse
+      allow create: if isSeller();
+      allow update: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || isAdmin());
+    }
+
+    match /marketplaceOrders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || isAdmin());
+    }
+
+    match /serviceOrders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      // Service orders (airtime, data, social media, etc) always debit the
+      // wallet, so they are created/updated exclusively by Cloud Functions.
+      allow create, update: if false;
+    }
+
+    match /socialProfiles/{profileId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create, delete: if false; // Only backend creates notifications
+    }
+
+    match /supportTickets/{ticketId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin();
+    }
+
+    // --- Phase 4: HK Points ---
+
+    match /points/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false; // Only Cloud Functions mutate points balances
+    }
+
+    match /pointsTransactions/{transactionId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false; // Only Cloud Functions create points transactions
+    }
+
+    // --- Phase 4: Referrals ---
+
+    match /referrals/{referralId} {
+      allow read: if isAuthenticated() && (resource.data.referrerId == request.auth.uid || resource.data.referredUserId == request.auth.uid || isAdmin());
+      allow write: if false; // Only Cloud Functions create/update referral records
+    }
+
+    match /referralBalances/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false; // Only Cloud Functions mutate referral balances
+    }
+
+    match /referralCodes/{code} {
+      allow read: if isAuthenticated(); // Lets the client validate a code exists before submitting
+      allow write: if false; // Only Cloud Functions assign referral codes
+    }
+
+    // --- Phase 4 continuation: Rewards / Vouchers ---
+
+    match /vouchers/{voucherId} {
+      allow read: if isAuthenticated(); // Public catalog, browsable by any signed-in user
+      allow write: if false; // Managed by the future Admin Platform via Cloud Functions
+    }
+
+    match /userVouchers/{userVoucherId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false; // Only Cloud Functions issue/redeem vouchers
+    }
+
+    // --- Phase 4 continuation: Cashback ---
+
+    match /cashbackBalances/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false; // Only Cloud Functions mutate cashback balances
+    }
+
+    match /cashbackTransactions/{transactionId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false; // Only Cloud Functions create cashback transactions
+    }
+
+    // --- Phase 4 continuation: Admin panel platform config ---
+
+    match /adminPanel/{docId} {
+      allow read: if true; // Public platform content (maintenance flag, announcements, tutorials, tips)
+      allow write: if false; // Reserved for the future Admin Platform
+    }
+
+    // --- Phase 4 continuation: Dispute Center ---
+
+    match /disputes/{disputeId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create, update: if false; // Only Cloud Functions create disputes; admin responses come via the future Admin Platform
+    }
+
+    // --- Phase 4 continuation: Receipts ---
+
+    match /receipts/{receiptId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false; // Only Cloud Functions generate receipts
+    }
+  }
+}

@@ -1,0 +1,54 @@
+import * as functions from 'firebase-functions';
+
+export const APP_ENV = process.env.APP_ENV || functions.config().thehk?.env || 'development';
+
+export const SECRETS = {
+  paystack: {
+    secretKey: process.env.PAYSTACK_SECRET_KEY || '',
+    publicKey: process.env.PAYSTACK_PUBLIC_KEY || functions.config().paystack?.publickey || '',
+    webhookSecret: process.env.PAYSTACK_WEBHOOK_SECRET || functions.config().paystack?.webhooksecret || '',
+  },
+  korapay: {
+    secretKey: process.env.KORAPAY_SECRET_KEY || '',
+    publicKey: process.env.KORAPAY_PUBLIC_KEY || functions.config().korapay?.publickey || '',
+    webhookSecret: process.env.KORAPAY_WEBHOOK_SECRET || functions.config().korapay?.webhooksecret || '',
+  },
+  owlet: {
+    apiKey: process.env.OWLET_API_KEY || '',
+    apiUrl: process.env.OWLET_API_URL || 'https://the-owlet.com/api/v2',
+  },
+  reloadly: {
+    clientId: process.env.RELOADLY_CLIENT_ID || '',
+    clientSecret: process.env.RELOADLY_CLIENT_SECRET || '',
+    sandbox: process.env.RELOADLY_SANDBOX === 'true',
+  },
+};
+
+export const CURRENCY = {
+  code: 'NGN',
+  minorUnit: 100,
+};
+
+export const MIN_FUNDING_AMOUNT = 500; // NGN
+
+// HK Points: single authoritative conversion rate. Points are always
+// computed from a naira amount as `amountNaira * HK_POINTS_PER_NAIRA`.
+// Kept as one constant (rather than hardcoded across screens/functions) so
+// changing it later - or eventually loading it from an admin-configurable
+// Firestore doc - only requires touching this one value.
+export const HK_POINTS_PER_NAIRA = 1; // 1 NGN = 1 HK Point
+export const MIN_POINTS_CONVERSION_NAIRA = 100; // ₦100 minimum per conversion
+
+// Referral: flat reward credited to the referrer's referral balance when
+// their referred user completes the activation event (see
+// functions/src/services/referralService.ts). A configurable single value,
+// not a full referral economy, per Phase 4 scope.
+export const REFERRAL_REWARD_KOBO = toKobo(200); // ₦200 per activated referral
+
+export function toKobo(amountInNaira: number): number {
+  return Math.round(amountInNaira * CURRENCY.minorUnit);
+}
+
+export function fromKobo(kobo: number): number {
+  return kobo / CURRENCY.minorUnit;
+}
