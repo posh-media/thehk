@@ -7,12 +7,16 @@ import { spacing, typography, borderRadius } from '@theme/tokens';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const tabs = [
-  { name: 'Home', path: '/(tabs)', icon: 'home' },
-  { name: 'Services', path: '/(tabs)/services', icon: 'grid' },
-  { name: 'Marketplace', path: '/(tabs)/marketplace', icon: 'cart' },
-  { name: 'Rewards', path: '/(tabs)/rewards', icon: 'gift' },
-  { name: 'Me', path: '/(tabs)/me', icon: 'person' },
+  { name: 'Home', path: '/(tabs)', icon: 'home', prefixes: ['/(tabs)', '/wallet'] },
+  { name: 'Services', path: '/(tabs)/services', icon: 'grid', prefixes: ['/(tabs)/services', '/services'] },
+  { name: 'Marketplace', path: '/(tabs)/marketplace', icon: 'cart', prefixes: ['/(tabs)/marketplace', '/marketplace'] },
+  { name: 'Rewards', path: '/(tabs)/rewards', icon: 'gift', prefixes: ['/(tabs)/rewards', '/rewards', '/profile'] },
+  { name: 'Me', path: '/(tabs)/me', icon: 'person', prefixes: ['/(tabs)/me', '/settings', '/social'] },
 ];
+
+function isTabActive(tab: typeof tabs[0], pathname: string) {
+  return tab.prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
 
 export function BottomNav() {
   const { colors } = useTheme();
@@ -32,21 +36,23 @@ export function BottomNav() {
       ]}
     >
       {tabs.map((tab) => {
-        const isIndex = tab.path === '/(tabs)';
-        const isActive = pathname === tab.path || (isIndex && pathname === '/(tabs)/index');
+        const isActive = isTabActive(tab, pathname);
         const iconName = isActive ? tab.icon : (`${tab.icon}-outline` as any);
 
         return (
           <TouchableOpacity
             key={tab.name}
             activeOpacity={0.7}
-            onPress={() => router.replace(tab.path as any)}
+            onPress={() => {
+              if (isActive) return;
+              router.replace(tab.path as any);
+            }}
             style={styles.tab}
           >
             {isActive ? (
-              <View style={[styles.pill, { backgroundColor: colors.surface }]}>
-                <Ionicons name={iconName} size={20} color={colors.primaryText} />
-                <Text style={[styles.pillLabel, { color: colors.primaryText }]}>{tab.name}</Text>
+              <View style={[styles.pill, { backgroundColor: colors.primary }]}>
+                <Ionicons name={iconName} size={20} color={colors.inverseText} />
+                <Text style={[styles.pillLabel, { color: colors.inverseText }]}>{tab.name}</Text>
               </View>
             ) : (
               <Ionicons name={iconName} size={24} color={colors.mutedText} />

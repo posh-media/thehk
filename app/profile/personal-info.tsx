@@ -1,12 +1,30 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Modal,
+  Alert,
+  ActivityIndicator,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
 import { GlassCard, GlassInput, GlassSelect, GlassButton, Header } from '@components';
 import { useAuthStore } from '@stores/authStore';
+import { storage } from '@infrastructure/firebase';
+import { repositories } from '@repositories/mockRepository';
 import { formatPhoneNumber } from '@lib/formatters';
+import type { UserPreferences } from '@/types/domain';
 
 const countries = [
   'Nigeria',
@@ -17,6 +35,26 @@ const countries = [
   'United Kingdom',
   'Canada',
 ];
+
+const appearanceOptions: { label: string; value: UserPreferences['appearance']; icon: string }[] = [
+  { label: 'System', value: 'system', icon: 'desktop-outline' },
+  { label: 'Dark', value: 'dark', icon: 'moon-outline' },
+  { label: 'Light', value: 'light', icon: 'sunny-outline' },
+];
+
+function parseDate(value: string): Date {
+  const d = value ? new Date(value) : new Date();
+  return isNaN(d.getTime()) ? new Date() : d;
+}
+
+function formatDate(value: Date | string): string {
+  const d = typeof value === 'string' ? new Date(value) : value;
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export default function PersonalInfoScreen() {
   const { colors } = useTheme();
@@ -30,28 +68,94 @@ export default function PersonalInfoScreen() {
   const [username, setUsername] = useState(user?.username || '');
   const [country, setCountry] = useState(user?.country || '');
   const [dateOfBirth, setDateOfBirth] = useState(user?.dateOfBirth || '');
+  const [preferences, setPreferences] = useState<UserPreferences>({
+    emailNotification: true,
+    pushNotification: true,
+    appearance: 'system',
+    ...user?.preferences,
+  });
+
+  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerDate, setPickerDate] = useState(parseDate(dateOfBirth));
+
+  async function handlePickImage() {
+    if (!user) return;
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Please allow access to your photo library to upload a profile picture.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+
+    const uri = result.assets[0].uri;
+    setUploading(true);
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const storageRef = ref(storage, `users/${user.id}/profile/avatar`);
+      await uploadBytes(storageRef, blob);
+      const photoUrl = await getDownloadURL(storageRef);
+
+      const updated = await repositories.auth.updateProfile(user.id, { photoUrl });
+      setUser(updated);
+    } catch (err: any) {
+      Alert.alert('Upload failed', err.message || 'Could not upload profile picture. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function onDateChange(_event: any, selected?: Date) {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (selected) {
+      setPickerDate(selected);
+      if (Platform.OS === 'android') {
+        setDateOfBirth(formatDate(selected));
+      }
+    }
+  }
+
+  function confirmDate() {
+    setDateOfBirth(formatDate(pickerDate));
+    setShowDatePicker(false);
+  }
 
   async function handleSave() {
     if (!user) return;
     setSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    setUser({
-      ...user,
-      firstName,
-      lastName,
-      displayName: `${firstName} ${lastName}`.trim() || user.displayName,
-      email,
-      phone: formatPhoneNumber(phone),
-      username,
-      country,
-      dateOfBirth,
-      updatedAt: new Date().toISOString(),
-    });
-    setSaving(false);
-    setSuccess(true);
-    setTimeout(() => setSuccess(false), 3000);
+    try {
+      const updated = await repositories.auth.updateProfile(user.id, {
+        firstName,
+        lastName,
+        displayName: `${firstName} ${lastName}`.trim() || user.displayName,
+        email,
+        phone: formatPhoneNumber(phone),
+        username,
+        country,
+        dateOfBirth,
+        preferences,
+      });
+      setUser(updated);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err: any) {
+      Alert.alert('Save failed', err.message || 'Could not save profile. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -60,21 +164,25 @@ export default function PersonalInfoScreen() {
         <Header title="Personal Information" />
 
         <View style={styles.avatarContainer}>
-          {user?.photoUrl ? (
-            <Image source={{ uri: user.photoUrl }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, { backgroundColor: colors.glassSurface }]}>
-              <Ionicons name="person" size={40} color={colors.primary} />
+          <TouchableOpacity activeOpacity={0.9} onPress={handlePickImage} disabled={uploading}>
+            {user?.photoUrl ? (
+              <Image source={{ uri: user.photoUrl }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: colors.glassSurface, alignItems: 'center', justifyContent: 'center' }]}>
+                <Ionicons name="person" size={40} color={colors.primary} />
+              </View>
+            )}
+            <View style={[styles.camera, { backgroundColor: colors.primary, borderColor: colors.background }]}>
+              {uploading ? (
+                <ActivityIndicator size="small" color={colors.inverseText} />
+              ) : (
+                <Ionicons name="camera" size={18} color={colors.inverseText} />
+              )}
             </View>
-          )}
-          <TouchableOpacity activeOpacity={0.8} style={[styles.camera, { backgroundColor: colors.primary, borderColor: colors.background }]}>
-            <Ionicons name="camera" size={18} color={colors.inverseText} />
           </TouchableOpacity>
         </View>
 
-        <Text style={[styles.name, { color: colors.primaryText }]}>
-          {user?.displayName || 'User'}
-        </Text>
+        <Text style={[styles.name, { color: colors.primaryText }]}>{user?.displayName || 'User'}</Text>
         <Text style={[styles.email, { color: colors.secondaryText }]}>{user?.email}</Text>
 
         <GlassCard style={styles.form}>
@@ -98,7 +206,63 @@ export default function PersonalInfoScreen() {
             placeholder="Select country"
             leftIcon="earth-outline"
           />
-          <GlassInput label="Date of Birth" value={dateOfBirth} onChangeText={setDateOfBirth} leftIcon="calendar-outline" placeholder="YYYY-MM-DD" />
+
+          <TouchableOpacity activeOpacity={0.8} onPress={() => setShowDatePicker(true)}>
+            <View pointerEvents="none">
+              <GlassInput
+                label="Date of Birth"
+                value={dateOfBirth ? formatDate(dateOfBirth) : ''}
+                placeholder="YYYY-MM-DD"
+                leftIcon="calendar-outline"
+                editable={false}
+              />
+            </View>
+          </TouchableOpacity>
+
+          <Text style={[styles.sectionLabel, { color: colors.secondaryText }]}>Preferences</Text>
+
+          <View style={[styles.preferenceRow, { borderBottomColor: colors.divider }]}>
+            <Text style={[styles.preferenceLabel, { color: colors.primaryText }]}>Email Notifications</Text>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setPreferences((p) => ({ ...p, emailNotification: !p.emailNotification }))}
+              style={[styles.toggleTrack, { backgroundColor: preferences.emailNotification ? colors.primary : colors.border }]}
+            >
+              <View style={[styles.toggleThumb, { backgroundColor: colors.inverseText, marginLeft: preferences.emailNotification ? 18 : 2 }]} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.preferenceRow, { borderBottomColor: colors.divider }]}>
+            <Text style={[styles.preferenceLabel, { color: colors.primaryText }]}>Push Notifications</Text>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setPreferences((p) => ({ ...p, pushNotification: !p.pushNotification }))}
+              style={[styles.toggleTrack, { backgroundColor: preferences.pushNotification ? colors.primary : colors.border }]}
+            >
+              <View style={[styles.toggleThumb, { backgroundColor: colors.inverseText, marginLeft: preferences.pushNotification ? 18 : 2 }]} />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[styles.sectionLabel, { color: colors.secondaryText }]}>Appearance</Text>
+          <View style={styles.themeRow}>
+            {appearanceOptions.map((option) => {
+              const active = preferences.appearance === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  activeOpacity={0.8}
+                  onPress={() => setPreferences((p) => ({ ...p, appearance: option.value }))}
+                  style={[
+                    styles.themeButton,
+                    { backgroundColor: active ? colors.primary : colors.surface },
+                  ]}
+                >
+                  <Ionicons name={option.icon as any} size={18} color={active ? colors.inverseText : colors.primaryText} />
+                  <Text style={[styles.themeLabel, { color: active ? colors.inverseText : colors.primaryText }]}>{option.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
           {success && (
             <View style={[styles.success, { backgroundColor: colors.successSurface }]}>
@@ -110,6 +274,25 @@ export default function PersonalInfoScreen() {
           <GlassButton title="Save Changes" onPress={handleSave} loading={saving} />
         </GlassCard>
       </View>
+
+      {showDatePicker && (
+        <Modal transparent animationType="slide" visible={showDatePicker} onRequestClose={() => setShowDatePicker(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.primaryText }]}>Select Date of Birth</Text>
+              <DateTimePicker
+                value={pickerDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'spinner'}
+                onChange={onDateChange}
+                maximumDate={new Date()}
+                themeVariant={colors.background === '#FFFFFF' ? 'light' : 'dark'}
+              />
+              <GlassButton title="Confirm" onPress={confirmDate} style={styles.modalButton} />
+            </View>
+          </View>
+        </Modal>
+      )}
     </ScrollView>
   );
 }
@@ -150,6 +333,51 @@ const styles = StyleSheet.create({
   form: { gap: spacing.md },
   row: { flexDirection: 'row', gap: spacing.md },
   half: { flex: 1 },
+  sectionLabel: {
+    fontSize: typography.sizes.sm,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  preferenceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+  },
+  preferenceLabel: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.medium as any,
+  },
+  toggleTrack: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    padding: 2,
+  },
+  toggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  themeRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  themeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.xl,
+  },
+  themeLabel: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold as any,
+  },
   success: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -161,5 +389,25 @@ const styles = StyleSheet.create({
   successText: {
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.semibold as any,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    padding: spacing.lg,
+    borderTopLeftRadius: borderRadius.xxl,
+    borderTopRightRadius: borderRadius.xxl,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold as any,
+    marginBottom: spacing.md,
+  },
+  modalButton: {
+    marginTop: spacing.md,
+    width: '100%',
   },
 });

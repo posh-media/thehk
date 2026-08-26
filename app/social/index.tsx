@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
-import { GlassCard, GlassButton, Header, LoadingState, ErrorState, EmptyState } from '@components';
+import { GlassCard, GlassButton, Header, SkeletonList, ErrorState, EmptyState } from '@components';
 import { SocialProfile } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 import { useAuthStore } from '@stores/authStore';
@@ -57,7 +57,14 @@ export default function SocialAccountsScreen() {
     }, [load])
   );
 
-  if (loading && profiles.length === 0) return <LoadingState />;
+  if (loading && profiles.length === 0) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header title="My Social Accounts" />
+        <SkeletonList count={5} />
+      </View>
+    );
+  }
   if (error && profiles.length === 0) return <ErrorState message={error} onRetry={load} />;
 
   return (

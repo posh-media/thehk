@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
-import { GlassCard, Header, LoadingState, ErrorState, EmptyState } from '@components';
+import { GlassCard, Header, SkeletonList, ErrorState, EmptyState } from '@components';
 import { CashbackTransaction } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 import { formatCurrency, formatDate } from '@lib/formatters';
@@ -46,7 +46,14 @@ export default function CashbackScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <LoadingState />;
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header title="Cashback" />
+        <SkeletonList count={5} />
+      </View>
+    );
+  }
   if (error) return <ErrorState message={error} onRetry={load} />;
 
   return (

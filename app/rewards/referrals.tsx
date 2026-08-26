@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
-import { GlassCard, Header, LoadingState, ErrorState, EmptyState, StatusBadge } from '@components';
+import { GlassCard, Header, SkeletonList, ErrorState, EmptyState, StatusBadge } from '@components';
 import { ReferralSummary } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 import { useAuthStore } from '@stores/authStore';
@@ -64,7 +64,14 @@ export default function ReferralsScreen() {
     }
   };
 
-  if (loading) return <LoadingState />;
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header title="Referrals" />
+        <SkeletonList count={5} />
+      </View>
+    );
+  }
   if (error) return <ErrorState message={error} onRetry={load} />;
 
   return (

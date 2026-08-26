@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
-import { GlassCard, SectionHeader, TransactionCard, LoadingState, ErrorState, EmptyState } from '@components';
+import { GlassCard, SectionHeader, TransactionCard, SkeletonList, ErrorState, EmptyState } from '@components';
 import { Wallet, Transaction } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 import { useAuthStore } from '@stores/authStore';
@@ -38,7 +38,16 @@ export default function WalletScreen() {
     load();
   }, [user?.id]);
 
-  if (loading) return <LoadingState />;
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.inner}>
+          <Text style={[styles.title, { color: colors.primaryText }]}>Wallet</Text>
+          <SkeletonList count={5} />
+        </View>
+      </View>
+    );
+  }
   if (error) return <ErrorState message={error} onRetry={() => setLoading(true)} />;
 
   return (

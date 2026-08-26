@@ -11,10 +11,15 @@ export interface PaymentSummaryRow {
   value: string;
 }
 
+export interface PaymentChoice {
+  useCashback: boolean;
+  usePoints: boolean;
+}
+
 interface PaymentBottomSheetProps {
   visible: boolean;
   onClose: () => void;
-  onConfirm: (useCashback: boolean) => void;
+  onConfirm: (choice: PaymentChoice) => void;
   loading?: boolean;
   title: string;
   summaryRows: PaymentSummaryRow[];
@@ -23,6 +28,8 @@ interface PaymentBottomSheetProps {
   pointsBalance: number; // whole HK Points, display only
   cashbackBalance: number; // kobo
   cashbackEligible?: boolean; // set false for services that don't support cashback yet
+  allowPointsPayment?: boolean; // allow paying with HK Points when applicable
+  pointsCost?: number; // whole HK Points required when allowPointsPayment is true
   confirmLabel?: string;
 }
 
@@ -37,6 +44,9 @@ interface PaymentBottomSheetProps {
  *
  * Not every service opts into cashback yet - pass `cashbackEligible={false}`
  * to hide the toggle entirely for services that don't support it.
+ *
+ * `allowPointsPayment` adds an HK Points toggle. When selected, the wallet
+ * charge is zero and the server debits the configured HK Points amount.
  */
 export function PaymentBottomSheet({
   visible,
@@ -50,17 +60,22 @@ export function PaymentBottomSheet({
   pointsBalance,
   cashbackBalance,
   cashbackEligible = true,
+  allowPointsPayment = false,
+  pointsCost = 0,
   confirmLabel = 'Confirm Payment',
 }: PaymentBottomSheetProps) {
   const { colors } = useTheme();
   const [useCashback, setUseCashback] = useState(false);
+  const [usePoints, setUsePoints] = useState(false);
+
+  const canPayWithPoints = allowPointsPayment && pointsCost > 0 && pointsBalance >= pointsCost;
 
   const cashbackUsed = useMemo(
-    () => (useCashback ? Math.min(cashbackBalance, totalAmount) : 0),
-    [useCashback, cashbackBalance, totalAmount]
+    () => (useCashback && !usePoints ? Math.min(cashbackBalance, totalAmount) : 0),
+    [useCashback, usePoints, cashbackBalance, totalAmount]
   );
-  const remaining = totalAmount - cashbackUsed;
-  const canAfford = remaining <= walletBalance;
+  const remaining = usePoints ? 0 : totalAmount - cashbackUsed;
+  const canAfford = usePoints ? true : remaining <= walletBalance;
 
   return (
     <GlassBottomSheet visible={visible} onClose={onClose}>
@@ -83,7 +98,25 @@ export function PaymentBottomSheet({
           <ResourceRow label="Cashback Balance" value={formatCurrency(cashbackBalance)} />
         </View>
 
-        {cashbackEligible && cashbackBalance > 0 && (
+        {canPayWithPoints && (
+          <View style={[styles.toggleRow, { borderColor: colors.glassBorder }]}>
+            <View>
+              <Text style={[styles.toggleLabel, { color: colors.primaryText }]}>Pay with HK Points</Text>
+              <Text style={[styles.toggleHint, { color: colors.secondaryText }]}>{pointsCost.toLocaleString()} pts</Text>
+            </View>
+            <Switch
+              value={usePoints}
+              onValueChange={(v) => {
+                setUsePoints(v);
+                if (v) setUseCashback(false);
+              }}
+              trackColor={{ false: colors.glassBorder, true: colors.primary }}
+              thumbColor={colors.inverseText}
+            />
+          </View>
+        )}
+
+        {cashbackEligible && cashbackBalance > 0 && !usePoints && (
           <View style={[styles.toggleRow, { borderColor: colors.glassBorder }]}>
             <View>
               <Text style={[styles.toggleLabel, { color: colors.primaryText }]}>Use Cashback</Text>
@@ -109,17 +142,17 @@ export function PaymentBottomSheet({
           <Text style={[styles.rowValue, { color: colors.success }]}>{formatCurrency(cashbackUsed)}</Text>
         </View>
         <View style={styles.row}>
-          <Text style={[styles.totalLabel, { color: colors.primaryText }]}>Amount to Pay</Text>
-          <Text style={[styles.totalValue, { color: colors.primary }]}>{formatCurrency(remaining)}</Text>
+          <Text style={[styles.totalLabel, { color: colors.primaryText }]}>{usePoints ? 'Paid with' : 'Amount to Pay'}</Text>
+          <Text style={[styles.totalValue, { color: colors.primary }]}>{usePoints ? `${pointsCost.toLocaleString()} pts` : formatCurrency(remaining)}</Text>
         </View>
 
         {!canAfford && (
-          <Text style={[styles.errorText, { color: colors.error }]}>Insufficient wallet balance for the remaining amount</Text>
+          <Text style={[styles.errorText, { color: colors.error }]}>Insufficient balance for the remaining amount</Text>
         )}
 
         <GlassButton
           title={confirmLabel}
-          onPress={() => onConfirm(useCashback)}
+          onPress={() => onConfirm({ useCashback, usePoints })}
           loading={loading}
           disabled={!canAfford}
           style={styles.confirmButton}

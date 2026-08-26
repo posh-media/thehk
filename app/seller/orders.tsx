@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
-import { GlassCard, GlassButton, GlassInput, StatusBadge, LoadingState, ErrorState, EmptyState, GlassBottomSheet } from '@components';
+import { GlassCard, GlassButton, GlassInput, StatusBadge, SkeletonCard, ErrorState, EmptyState, GlassBottomSheet } from '@components';
 import { MarketplaceOrder } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 import { useAuthStore } from '@stores/authStore';
@@ -134,7 +134,18 @@ export default function SellerOrdersScreen() {
           </ScrollView>
 
           {loading ? (
-            <LoadingState />
+            <>
+              <View style={styles.statsGrid}>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <View key={i} style={styles.statCardOuter}>
+                    <SkeletonCard style={styles.statCard} />
+                  </View>
+                ))}
+              </View>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <SkeletonCard key={`order-${i}`} style={styles.orderCard} />
+              ))}
+            </>
           ) : error ? (
             <ErrorState message={error} onRetry={() => setLoading(true)} />
           ) : filteredOrders.length === 0 ? (

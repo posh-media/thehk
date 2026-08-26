@@ -11,7 +11,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
-import { GlassCard, GlassButton, GlassInput, Header, LoadingState } from '@components';
+import { GlassCard, GlassButton, GlassInput, Header, LoadingState, PaymentBottomSheet } from '@components';
 import { Bank, ReceiptRecord } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 import { useAuthStore } from '@stores/authStore';
@@ -39,6 +39,12 @@ export default function GenerateReceiptScreen() {
   const [receipt, setReceipt] = useState<ReceiptRecord | null>(null);
   const [bankPickerVisible, setBankPickerVisible] = useState(false);
 
+  const [showPaymentSheet, setShowPaymentSheet] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [pointsBalance, setPointsBalance] = useState(0);
+  const [cashbackBalance, setCashbackBalance] = useState(0);
+
   const [amount, setAmount] = useState('');
   const [senderName, setSenderName] = useState(user?.displayName || '');
   const [senderAccount, setSenderAccount] = useState('');
@@ -53,6 +59,26 @@ export default function GenerateReceiptScreen() {
   useEffect(() => {
     if (prefilledAmount) setAmount(prefilledAmount);
   }, [prefilledAmount]);
+
+  useEffect(() => {
+    async function loadBalances() {
+      if (!user) return;
+      try {
+        const [wallet, points, cashback] = await Promise.all([
+          repositories.wallet.getWallet(user.id),
+          repositories.rewards.getPointsBalance(),
+          repositories.cashback.getBalance(),
+        ]);
+        setWalletBalance(wallet.balance || 0);
+        setPointsBalance(points.balance || 0);
+        setCashbackBalance(cashback.balance || 0);
+      } catch (err) {
+        // Non-fatal: the payment sheet will show 0 and the user can still see insufficient balance.
+        console.warn('Could not load payment balances:', err);
+      }
+    }
+    loadBalances();
+  }, [user?.id]);
 
   useEffect(() => {
     async function load() {
@@ -94,22 +120,29 @@ export default function GenerateReceiptScreen() {
       return;
     }
     setError('');
-    setGenerating(true);
+    setShowPaymentSheet(true);
+  }
+
+  async function handleConfirmPayment({ usePoints, useCashback }: { usePoints: boolean; useCashback: boolean }) {
+    if (!receiverBank) return;
+    setShowPaymentSheet(false);
+    setSubmitting(true);
     try {
-      const result = await repositories.receipt.generateReceipt({
-        transactionId,
+      const result = await repositories.receipt.purchaseBankGenReceipt({
         amount: Number(amount),
         senderName,
         senderAccountNumber: senderAccount || undefined,
         receiverBankName: receiverBank.name,
         receiverAccountNumber: receiverAccount,
         receiverAccountName: receiverName,
+        usePoints,
+        useCashback,
       });
       setReceipt(result);
     } catch (err: any) {
-      setError(err.message || 'Failed to generate receipt');
+      setError(err.message || 'Payment failed. Please check your balance and try again.');
     } finally {
-      setGenerating(false);
+      setSubmitting(false);
     }
   }
 
@@ -186,7 +219,7 @@ export default function GenerateReceiptScreen() {
           {verifyError ? <Text style={[styles.hint, { color: colors.error }]}>{verifyError}</Text> : null}
           <GlassInput label="Receiver Account Name" value={receiverName} onChangeText={setReceiverName} leftIcon="person-outline" placeholder="Account holder name" containerStyle={styles.field} />
 
-          <GlassButton title="Generate Receipt" onPress={handleGenerate} loading={generating} style={styles.button} />
+          <GlassButton title="Generate Receipt" onPress={handleGenerate} loading={false} style={styles.button} />
         </GlassCard>
 
         {receipt ? (
@@ -227,6 +260,25 @@ export default function GenerateReceiptScreen() {
             </View>
           </>
         ) : null}
+        <PaymentBottomSheet
+          visible={showPaymentSheet}
+          onClose={() => setShowPaymentSheet(false)}
+          onConfirm={handleConfirmPayment}
+          loading={submitting}
+          title="Bank Gen Receipt"
+          summaryRows={[
+            { label: 'Service', value: 'Bank Receipt Generation' },
+            { label: 'Price', value: '₦100 or 100 HK Points' },
+          ]}
+          totalAmount={10000}
+          walletBalance={walletBalance}
+          pointsBalance={pointsBalance}
+          cashbackBalance={cashbackBalance}
+          cashbackEligible={false}
+          allowPointsPayment
+          pointsCost={100}
+          confirmLabel="Pay & Generate"
+        />
       </View>
 
       <Modal visible={bankPickerVisible} animationType="slide" onRequestClose={() => setBankPickerVisible(false)}>

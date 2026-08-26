@@ -27,6 +27,8 @@ export interface RemoteTopupResult {
 }
 
 export interface AirtimeDataProvider {
+  name: string;
+  isConfigured(): boolean;
   listOperators(countryCode: string): Promise<RemoteOperator[]>;
   detectOperator(phone: string, countryCode: string): Promise<RemoteOperator | null>;
   getDataPlans(operatorId: string): Promise<RemoteDataPlan[]>;

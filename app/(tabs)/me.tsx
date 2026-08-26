@@ -31,7 +31,7 @@ export default function ProfileScreen() {
             {user?.photoUrl ? (
               <Image source={{ uri: user.photoUrl }} style={styles.avatar} />
             ) : (
-              <View style={[styles.avatar, { backgroundColor: colors.glassSurface }]}>
+              <View style={[styles.avatar, { backgroundColor: colors.glassSurface, alignItems: 'center', justifyContent: 'center' }]}>
                 <Ionicons name="person" size={32} color={colors.primary} />
               </View>
             )}

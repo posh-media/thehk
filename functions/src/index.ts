@@ -7,23 +7,40 @@ import { listNetworkOperators, detectNetworkOperator, listDataPlans, placeAirtim
 import { listBillCategories, listBillers, verifyBillCustomer, payBill } from './services/billService';
 import { listGiftCardProducts, getGiftCardProduct, placeGiftCardOrder, getGiftCardRedeemCodes } from './services/giftCardService';
 import { assignReferralCode, applyReferralCode, getReferralSummary } from './services/referralService';
-import { ensurePoints, convertWalletToPoints, convertReferralBalanceToPoints, getPointsTransactionHistory } from './services/pointsService';
+import { ensurePoints, convertWalletToPoints, convertReferralBalanceToPoints, getPointsTransactionHistory, awardSignupBonus } from './services/pointsService';
+import { getPlatformConfig } from './services/adminPanelService';
 import { ensureCashbackBalance, getCashbackHistory } from './services/cashbackService';
 import { listVoucherCatalog, listUserVouchers, claimVoucher, redeemVoucher } from './services/rewardsService';
-import { getPlatformConfig } from './services/adminPanelService';
 import { createDispute, listDisputes } from './services/disputeService';
 import { verifyBankAccountNumber } from './services/bankService';
-import { generateReceipt, getReceipt } from './services/receiptService';
+import { generateReceipt, getReceipt, purchaseBankGenReceipt } from './services/receiptService';
 import { OwletProvider } from './providers/owletProvider';
-import { ReloadlyProvider } from './providers/reloadlyProvider';
-import { ReloadlyUtilityProvider } from './providers/reloadlyUtilityProvider';
 import { ReloadlyGiftCardProvider } from './providers/reloadlyGiftCardProvider';
+import { getAirtimeDataProvider, getDataProvider, getBillProvider } from './providers/providerFactory';
 import { toKobo, SECRETS } from './config';
 
 const owletProvider = new OwletProvider(SECRETS.owlet.apiKey, SECRETS.owlet.apiUrl);
-const reloadlyProvider = new ReloadlyProvider(SECRETS.reloadly.clientId, SECRETS.reloadly.clientSecret, SECRETS.reloadly.sandbox);
-const reloadlyUtilityProvider = new ReloadlyUtilityProvider(SECRETS.reloadly.clientId, SECRETS.reloadly.clientSecret, SECRETS.reloadly.sandbox);
 const reloadlyGiftCardProvider = new ReloadlyGiftCardProvider(SECRETS.reloadly.clientId, SECRETS.reloadly.clientSecret, SECRETS.reloadly.sandbox);
+
+// Provider instances are resolved per-request so the admin platform config
+// (airtimeProvider / dataProvider) can override the env defaults without a
+// redeploy. Unconfigured providers are detected before any network call is
+// made, so users see a friendly "unavailable" message rather than raw
+// authentication errors.
+async function resolveAirtimeProvider() {
+  const config = await getPlatformConfig();
+  return getAirtimeDataProvider(config.airtimeProvider);
+}
+
+async function resolveDataProvider() {
+  const config = await getPlatformConfig();
+  return getDataProvider(config.dataProvider);
+}
+
+async function resolveBillProvider() {
+  const config = await getPlatformConfig();
+  return getBillProvider(config.billProvider);
+}
 
 const REGION = 'us-central1';
 const RUNTIME_OPTS: functions.RuntimeOptions = {
@@ -59,6 +76,11 @@ export const onUserCreated = functions
       photoUrl: user.photoURL || null,
       country: null,
       dateOfBirth: null,
+      preferences: {
+        emailNotification: true,
+        pushNotification: true,
+        appearance: 'system',
+      },
       role: 'user',
       isVerified: user.emailVerified,
       referralCode,
@@ -75,6 +97,14 @@ export const onUserCreated = functions
       currency: 'NGN',
       updatedAt: now,
     });
+
+    // One-time signup bonus: this is wrapped in a server-side guard so
+    // retries/idempotent triggers never award it twice.
+    try {
+      await awardSignupBonus(user.uid);
+    } catch (err) {
+      console.error(`Signup bonus failed for ${user.uid}:`, err);
+    }
   });
 
 export const applyReferral = functions
@@ -168,6 +198,8 @@ export const updateUserProfile = functions
     if (data.username !== undefined) update.username = data.username;
     if (data.country !== undefined) update.country = data.country;
     if (data.dateOfBirth !== undefined) update.dateOfBirth = data.dateOfBirth;
+    if (data.photoUrl !== undefined) update.photoUrl = data.photoUrl;
+    if (data.preferences !== undefined) update.preferences = data.preferences;
     await db.collection('users').doc(uid).update(update);
   });
 
@@ -373,7 +405,7 @@ export const getNetworkOperators = functions
   .https.onCall(async (_data, context) => {
     requireAuth(context);
     try {
-      const operators = await listNetworkOperators(reloadlyProvider);
+      const operators = await listNetworkOperators(await resolveAirtimeProvider());
       return { operators };
     } catch (err) {
       throw new functions.https.HttpsError('unavailable', (err as Error).message);
@@ -387,7 +419,7 @@ export const detectOperatorForPhone = functions
     requireAuth(context);
     if (!data?.phone) throw new functions.https.HttpsError('invalid-argument', 'phone is required.');
     try {
-      const operator = await detectNetworkOperator(reloadlyProvider, String(data.phone));
+      const operator = await detectNetworkOperator(await resolveAirtimeProvider(), String(data.phone));
       return { operator };
     } catch (err) {
       throw new functions.https.HttpsError('unavailable', (err as Error).message);
@@ -401,7 +433,7 @@ export const getDataPlans = functions
     requireAuth(context);
     if (!data?.operatorId) throw new functions.https.HttpsError('invalid-argument', 'operatorId is required.');
     try {
-      const plans = await listDataPlans(reloadlyProvider, String(data.operatorId));
+      const plans = await listDataPlans(await resolveDataProvider(), String(data.operatorId));
       return { plans };
     } catch (err) {
       throw new functions.https.HttpsError('unavailable', (err as Error).message);
@@ -418,7 +450,7 @@ export const purchaseAirtime = functions
       throw new functions.https.HttpsError('invalid-argument', 'operatorId, phone and amount are required.');
     }
     try {
-      const order = await placeAirtimeOrder(reloadlyProvider, {
+      const order = await placeAirtimeOrder(await resolveAirtimeProvider(), {
         userId: uid,
         operatorId: String(operatorId),
         phone: String(phone),
@@ -440,7 +472,7 @@ export const purchaseData = functions
       throw new functions.https.HttpsError('invalid-argument', 'operatorId, phone and planId are required.');
     }
     try {
-      const order = await placeDataOrder(reloadlyProvider, {
+      const order = await placeDataOrder(await resolveDataProvider(), {
         userId: uid,
         operatorId: String(operatorId),
         phone: String(phone),
@@ -460,7 +492,7 @@ export const getBillCategories = functions
   .https.onCall(async (_data, context) => {
     requireAuth(context);
     try {
-      const categories = await listBillCategories(reloadlyUtilityProvider);
+      const categories = await listBillCategories(await resolveBillProvider());
       return { categories };
     } catch (err) {
       throw new functions.https.HttpsError('unavailable', (err as Error).message);
@@ -473,7 +505,7 @@ export const getBillers = functions
   .https.onCall(async (data, context) => {
     requireAuth(context);
     try {
-      const billers = await listBillers(reloadlyUtilityProvider, data?.categoryId ? String(data.categoryId) : undefined);
+      const billers = await listBillers(await resolveBillProvider(), data?.categoryId ? String(data.categoryId) : undefined);
       return { billers };
     } catch (err) {
       throw new functions.https.HttpsError('unavailable', (err as Error).message);
@@ -490,7 +522,7 @@ export const verifyBillerCustomer = functions
       throw new functions.https.HttpsError('invalid-argument', 'billerId and customerNumber are required.');
     }
     try {
-      const customer = await verifyBillCustomer(reloadlyUtilityProvider, String(billerId), String(customerNumber));
+      const customer = await verifyBillCustomer(await resolveBillProvider(), String(billerId), String(customerNumber));
       return { customer };
     } catch (err) {
       throw new functions.https.HttpsError('unavailable', (err as Error).message);
@@ -507,7 +539,7 @@ export const payUtilityBill = functions
       throw new functions.https.HttpsError('invalid-argument', 'billerId, customerNumber and amount are required.');
     }
     try {
-      const order = await payBill(reloadlyUtilityProvider, {
+      const order = await payBill(await resolveBillProvider(), {
         userId: uid,
         billerId: String(billerId),
         customerNumber: String(customerNumber),
@@ -728,6 +760,33 @@ export const generateReceiptFn = functions
         receiverBankName: String(data?.receiverBankName || ''),
         receiverAccountNumber: String(data?.receiverAccountNumber || ''),
         receiverAccountName: String(data?.receiverAccountName || ''),
+      });
+      return { receipt };
+    } catch (err) {
+      throw new functions.https.HttpsError('failed-precondition', (err as Error).message);
+    }
+  });
+
+export const purchaseBankGenReceiptFn = functions
+  .region(REGION)
+  .runWith(RUNTIME_OPTS)
+  .https.onCall(async (data, context) => {
+    const uid = requireAuth(context);
+    const { amount, senderName, senderAccountNumber, receiverBankName, receiverAccountNumber, receiverAccountName, usePoints, useCashback } = data || {};
+    if (!amount || !senderName || !receiverBankName || !receiverAccountNumber || !receiverAccountName) {
+      throw new functions.https.HttpsError('invalid-argument', 'amount, senderName, receiverBankName, receiverAccountNumber and receiverAccountName are required.');
+    }
+    try {
+      const receipt = await purchaseBankGenReceipt({
+        userId: uid,
+        amount: toKobo(Number(amount || 0)),
+        senderName: String(senderName),
+        senderAccountNumber: senderAccountNumber ? String(senderAccountNumber) : undefined,
+        receiverBankName: String(receiverBankName),
+        receiverAccountNumber: String(receiverAccountNumber),
+        receiverAccountName: String(receiverAccountName),
+        usePoints: Boolean(usePoints),
+        useCashback: Boolean(useCashback),
       });
       return { receipt };
     } catch (err) {

@@ -5,7 +5,7 @@ import {
   sendPasswordResetEmail,
   sendEmailVerification,
   onAuthStateChanged,
-  updateProfile,
+  updateProfile as updateFirebaseProfile,
   User as FirebaseUser,
   UserCredential,
 } from 'firebase/auth';
@@ -86,6 +86,11 @@ function mapFirebaseUser(fu: FirebaseUser | null): User | null {
     photoUrl: fu.photoURL,
     country: null,
     dateOfBirth: null,
+    preferences: {
+      emailNotification: true,
+      pushNotification: true,
+      appearance: 'system',
+    },
     role: 'user',
     isVerified: fu.emailVerified,
     createdAt: fu.metadata.creationTime || new Date().toISOString(),
@@ -167,13 +172,30 @@ class FirebaseAuthRepository implements AuthRepository {
   async signUp(email: string, password: string, data: Partial<User>): Promise<User> {
     const cred: UserCredential = await createUserWithEmailAndPassword(auth, email, password);
     const displayName = [data.firstName, data.lastName].filter(Boolean).join(' ');
-    await updateProfile(cred.user, { displayName: displayName || '' });
+    await updateFirebaseProfile(cred.user, { displayName: displayName || '' });
     await sendEmailVerification(cred.user);
     this.currentUser = {
       ...mapFirebaseUser(cred.user)!,
       firstName: data.firstName || null,
       lastName: data.lastName || null,
     };
+    return this.currentUser;
+  }
+
+  async updateProfile(_userId: string, data: Partial<User>): Promise<User> {
+    const fn = getCallable<Partial<User>, void>('updateUserProfile');
+    await fn({ ...data });
+    const authUser = auth.currentUser;
+    if (authUser && (data.displayName !== undefined || data.photoUrl !== undefined)) {
+      await updateFirebaseProfile(authUser, {
+        displayName: data.displayName ?? authUser.displayName ?? '',
+        photoURL: data.photoUrl ?? authUser.photoURL ?? '',
+      });
+    }
+    if (!this.currentUser) {
+      throw new Error('No current user');
+    }
+    this.currentUser = { ...this.currentUser, ...data, updatedAt: new Date().toISOString() };
     return this.currentUser;
   }
 
@@ -599,6 +621,21 @@ class FirebaseReceiptRepository implements ReceiptRepository {
     receiverAccountName: string;
   }): Promise<ReceiptRecord> {
     const fn = getCallable<typeof data, { receipt: ReceiptRecord }>('generateReceiptFn');
+    const { data: result } = await fn(data);
+    return result.receipt;
+  }
+
+  async purchaseBankGenReceipt(data: {
+    amount: number;
+    senderName: string;
+    senderAccountNumber?: string;
+    receiverBankName: string;
+    receiverAccountNumber: string;
+    receiverAccountName: string;
+    usePoints?: boolean;
+    useCashback?: boolean;
+  }): Promise<ReceiptRecord> {
+    const fn = getCallable<typeof data, { receipt: ReceiptRecord }>('purchaseBankGenReceipt');
     const { data: result } = await fn(data);
     return result.receipt;
   }

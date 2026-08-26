@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
-import { GlassCard, GlassInput, GlassSelect, GlassButton, Header, LoadingState, ErrorState, EmptyState, StatusBadge } from '@components';
+import { GlassCard, GlassInput, GlassSelect, GlassButton, Header, SkeletonList, ErrorState, EmptyState, StatusBadge } from '@components';
 import { Dispute } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 import { formatDate } from '@lib/formatters';
@@ -74,7 +74,14 @@ export default function DisputesScreen() {
     }
   }
 
-  if (loading) return <LoadingState />;
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header title="Dispute Center" />
+        <SkeletonList count={5} />
+      </View>
+    );
+  }
   if (error) return <ErrorState message={error} onRetry={load} />;
 
   return (

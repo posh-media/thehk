@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { BackHandler, ToastAndroid } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { BackHandler, Platform, ToastAndroid } from 'react-native';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -12,37 +12,52 @@ import { StyleSheet } from 'react-native';
 // and restores the user's persisted session on app startup.
 import '@repositories/mockRepository';
 
+const HOME_PATHS = new Set(['/(tabs)', '/(tabs)/index']);
+const TAB_ROOT_PREFIX = '/(tabs)';
+const DOUBLE_TAP_MS = 2000;
+
 function BackButtonHandler() {
   const router = useRouter();
   const pathname = usePathname();
-  const [lastBack, setLastBack] = useState(0);
+  const lastBackPress = useRef(0);
 
   useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
     const onBackPress = () => {
+      // Let Expo Router handle normal back navigation whenever a screen
+      // history exists (child/detail pages -> previous page).
       if (router.canGoBack()) {
         return false;
       }
-      // On a non-home tab root, go home instead of exiting.
-      if (pathname !== '/(tabs)' && pathname !== '/(tabs)/index' && pathname.startsWith('/(tabs)')) {
+
+      const isHome = HOME_PATHS.has(pathname);
+      const isTabRoot = pathname.startsWith(TAB_ROOT_PREFIX);
+
+      // On a non-home tab root, navigate home instead of exiting.
+      if (!isHome && isTabRoot) {
         router.replace('/(tabs)' as any);
         return true;
       }
-      if (pathname === '/(tabs)' || pathname === '/(tabs)/index') {
+
+      // On Home, implement the standard Android double-back-to-exit.
+      if (isHome) {
         const now = Date.now();
-        if (now - lastBack < 2000) {
+        if (now - lastBackPress.current < DOUBLE_TAP_MS) {
           BackHandler.exitApp();
           return true;
         }
-        setLastBack(now);
-        ToastAndroid?.show('Press back again to exit', ToastAndroid.SHORT);
+        lastBackPress.current = now;
+        ToastAndroid.show('Press back again to exit', ToastAndroid.SHORT);
         return true;
       }
+
       return false;
     };
 
     const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => sub.remove();
-  }, [pathname, lastBack]);
+  }, [pathname, router]);
 
   return null;
 }

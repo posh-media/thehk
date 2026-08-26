@@ -16,6 +16,12 @@ export type TransactionType =
   | 'referral_reward'
   | 'points_conversion';
 
+export interface UserPreferences {
+  emailNotification: boolean;
+  pushNotification: boolean;
+  appearance: 'dark' | 'light' | 'system';
+}
+
 export interface User {
   id: string;
   email: string;
@@ -27,6 +33,7 @@ export interface User {
   photoUrl: string | null;
   country: string | null;
   dateOfBirth: string | null;
+  preferences: UserPreferences;
   role: 'user' | 'seller' | 'admin' | 'support';
   isVerified: boolean;
   createdAt: string;
@@ -418,6 +425,9 @@ export interface AdminPlatformConfig {
   announcements: string[];
   tutorials: AdminTutorial[];
   tips: string[];
+  airtimeProvider?: 'reloadly' | 'owlet' | string;
+  dataProvider?: 'reloadly' | 'owlet' | string;
+  billProvider?: 'reloadly' | string;
   updatedAt: string;
 }
 

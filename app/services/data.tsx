@@ -23,6 +23,7 @@ export default function DataScreen() {
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [plansLoading, setPlansLoading] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -61,6 +62,21 @@ export default function DataScreen() {
       setPlansError(err.message || 'Unable to load data plans right now.');
     } finally {
       setPlansLoading(false);
+    }
+  }
+
+  async function handlePhoneBlur() {
+    if (phone.length < 10) return;
+    setDetecting(true);
+    try {
+      const detected = await repositories.utility.detectNetworkOperator(phone);
+      if (detected && detected.id !== operatorId) {
+        loadPlans(detected.id);
+      }
+    } catch {
+      // Auto-detect is a convenience only; the user can still pick manually.
+    } finally {
+      setDetecting(false);
     }
   }
 
@@ -122,22 +138,24 @@ export default function DataScreen() {
             <Text style={[styles.balanceValue, { color: colors.primaryText }]}>{balance !== null ? formatCurrency(balance) : '—'}</Text>
           </View>
 
-          <GlassSelect
-            label="Network"
-            options={operatorOptions}
-            value={operatorId}
-            onSelect={loadPlans}
-            placeholder={loading ? 'Loading networks...' : 'Select network'}
-            leftIcon="cellular"
-          />
           <GlassInput
             label="Phone Number"
             value={phone}
             onChangeText={setPhone}
+            onBlur={handlePhoneBlur}
             placeholder="08012345678"
             keyboardType="phone-pad"
             leftIcon="call"
             containerStyle={styles.input}
+          />
+          {detecting && <Text style={[styles.hint, { color: colors.secondaryText }]}>Detecting network…</Text>}
+          <GlassSelect
+            label={detecting ? 'Detected Network' : 'Network'}
+            options={operatorOptions}
+            value={operatorId}
+            onSelect={loadPlans}
+            placeholder={loading ? 'Loading networks...' : 'Select or detect network'}
+            leftIcon="cellular"
           />
         </GlassCard>
 
@@ -208,6 +226,7 @@ const styles = StyleSheet.create({
   balanceLabel: { fontSize: typography.sizes.sm },
   balanceValue: { fontSize: typography.sizes.base, fontWeight: typography.weights.bold as any },
   input: { marginBottom: 0 },
+  hint: { fontSize: typography.sizes.xs, marginBottom: spacing.sm },
   sectionTitle: { fontSize: typography.sizes.base, fontWeight: typography.weights.semibold as any, marginBottom: spacing.md },
   planGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg },
   planCard: { width: '47%', padding: spacing.md, borderRadius: 16, borderWidth: 1 },

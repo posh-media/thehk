@@ -50,6 +50,10 @@ export class ReloadlyUtilityProvider implements BillProvider {
   name = 'reloadly';
   private client: ReloadlyClient;
 
+  isConfigured(): boolean {
+    return this.client.isConfigured();
+  }
+
   constructor(clientId: string, clientSecret: string, isSandbox = false) {
     const baseUrl = isSandbox ? 'https://utilities-sandbox.reloadly.com' : 'https://utilities.reloadly.com';
     this.client = new ReloadlyClient(clientId, clientSecret, baseUrl, baseUrl);

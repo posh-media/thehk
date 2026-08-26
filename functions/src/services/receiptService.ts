@@ -1,6 +1,17 @@
 import { db } from '../admin';
 import { ReceiptRecord, Transaction } from '../types';
 import { generateReference } from '../utils';
+import { debitWalletForOrder, refundWalletDebit } from './walletService';
+import { debitPoints } from './pointsService';
+import { spendCashback } from './cashbackService';
+
+const BANK_GEN_PRICE_KOBO = 100 * 100; // ₦100
+const BANK_GEN_POINTS_COST = 100; // 100 HK Points
+
+interface PurchaseBankGenReceiptInput extends GenerateReceiptInput {
+  usePoints?: boolean;
+  useCashback?: boolean;
+}
 
 interface GenerateReceiptInput {
   userId: string;
@@ -51,6 +62,36 @@ export async function generateReceipt(input: GenerateReceiptInput): Promise<Rece
   };
   await db.collection('receipts').doc(id).set(receipt);
   return receipt;
+}
+
+export async function purchaseBankGenReceipt(input: PurchaseBankGenReceiptInput): Promise<ReceiptRecord> {
+  if (input.usePoints) {
+    await debitPoints({
+      userId: input.userId,
+      points: BANK_GEN_POINTS_COST,
+      description: 'Bank Gen receipt generation',
+      reference: generateReference('HK-PTS'),
+    });
+  } else {
+    let remaining = BANK_GEN_PRICE_KOBO;
+    if (input.useCashback) {
+      const { spent } = await spendCashback({
+        userId: input.userId,
+        requestedAmountKobo: BANK_GEN_PRICE_KOBO,
+        description: 'Bank Gen receipt generation',
+      });
+      remaining -= spent;
+    }
+    if (remaining > 0) {
+      await debitWalletForOrder({
+        userId: input.userId,
+        amount: remaining,
+        type: 'bank_gen_purchase',
+        description: 'Bank Gen receipt generation',
+      });
+    }
+  }
+  return generateReceipt(input);
 }
 
 export async function getReceipt(userId: string, receiptId: string): Promise<ReceiptRecord> {

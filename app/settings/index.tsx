@@ -52,8 +52,7 @@ export default function SettingsScreen() {
             <Row label="Email Notifications" icon="mail-outline" toggle isOn={toggles.emailNotifications} onToggle={() => toggle('emailNotifications')} />
           </Section>
 
-          <Section title="Appearance" icon="color-palette-outline">
-            <Text style={[styles.sectionLabel, { color: colors.secondaryText }]}>Theme</Text>
+          <Section title="Appearance" icon="color-palette-outline" noCard>
             <View style={styles.themeRow}>
               {themeOptions.map((option) => {
                 const active = mode === option.value;
@@ -99,7 +98,7 @@ export default function SettingsScreen() {
   );
 }
 
-function Section({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
+function Section({ title, icon, children, noCard }: { title: string; icon: string; children: React.ReactNode; noCard?: boolean }) {
   const { colors } = useTheme();
   return (
     <View style={styles.section}>
@@ -107,9 +106,13 @@ function Section({ title, icon, children }: { title: string; icon: string; child
         <Ionicons name={icon as any} size={18} color={colors.primary} />
         <Text style={[styles.sectionTitle, { color: colors.primaryText }]}>{title}</Text>
       </View>
-      <GlassCard style={styles.sectionCard} blur={false}>
-        {children}
-      </GlassCard>
+      {noCard ? (
+        <View style={styles.sectionCardContent}>{children}</View>
+      ) : (
+        <GlassCard style={styles.sectionCard} blur={false}>
+          {children}
+        </GlassCard>
+      )}
     </View>
   );
 }
@@ -192,6 +195,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   sectionCard: { padding: 0, overflow: 'hidden' },
+  sectionCardContent: { paddingHorizontal: 0, paddingVertical: 0 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

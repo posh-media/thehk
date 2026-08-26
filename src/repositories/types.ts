@@ -37,6 +37,7 @@ import {
 export interface AuthRepository {
   signIn(email: string, password: string): Promise<User>;
   signUp(email: string, password: string, data: Partial<User>): Promise<User>;
+  updateProfile(userId: string, data: Partial<User>): Promise<User>;
   signOut(): Promise<void>;
   resetPassword(email: string): Promise<void>;
   resendVerification(): Promise<void>;
@@ -149,6 +150,16 @@ export interface ReceiptRepository {
     receiverBankName: string;
     receiverAccountNumber: string;
     receiverAccountName: string;
+  }): Promise<ReceiptRecord>;
+  purchaseBankGenReceipt(data: {
+    amount: number;
+    senderName: string;
+    senderAccountNumber?: string;
+    receiverBankName: string;
+    receiverAccountNumber: string;
+    receiverAccountName: string;
+    usePoints?: boolean;
+    useCashback?: boolean;
   }): Promise<ReceiptRecord>;
   getReceipt(receiptId: string): Promise<ReceiptRecord>;
 }

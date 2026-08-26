@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
-import { GlassCard, ServiceCard, SectionHeader, LoadingState, ErrorState } from '@components';
+import { GlassCard, ServiceCard, SectionHeader, SkeletonList, ErrorState } from '@components';
 import { Service, ServiceCategory } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 
@@ -32,7 +32,16 @@ export default function ServicesScreen() {
     load();
   }, []);
 
-  if (loading) return <LoadingState />;
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.inner}>
+          <Text style={[styles.title, { color: colors.primaryText }]}>All Services</Text>
+          <SkeletonList count={5} />
+        </View>
+      </View>
+    );
+  }
   if (error) return <ErrorState message={error} onRetry={() => setLoading(true)} />;
 
   const filtered = services.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()));

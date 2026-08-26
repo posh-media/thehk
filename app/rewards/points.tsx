@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
-import { GlassCard, GlassInput, GlassButton, Header, LoadingState, ErrorState, EmptyState } from '@components';
+import { GlassCard, GlassInput, GlassButton, Header, SkeletonList, ErrorState, EmptyState } from '@components';
 import { Wallet, HKPointTransaction, PointsBalance, ReferralSummary } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 import { useAuthStore } from '@stores/authStore';
@@ -102,7 +102,14 @@ export default function PointsScreen() {
     }
   };
 
-  if (loading) return <LoadingState />;
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header title="HK Points" />
+        <SkeletonList count={5} />
+      </View>
+    );
+  }
   if (error) return <ErrorState message={error} onRetry={load} />;
 
   return (

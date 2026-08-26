@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@theme/useTheme';
-import { spacing, typography, borderRadius } from '@theme/tokens';
-import { GlassCard, SectionHeader, ServiceCard, TransactionCard, EmptyState, LoadingState, ErrorState, AnnouncementMarquee } from '@components';
+import { spacing, typography } from '@theme/tokens';
+import { GlassCard, SectionHeader, ServiceCard, TransactionCard, EmptyState, ErrorState, AnnouncementMarquee, SkeletonCard, SkeletonList, SkeletonText, SkeletonTitle, SkeletonCircle } from '@components';
 import { useResponsive } from '@hooks/useResponsive';
 import { useAuthStore } from '@stores/authStore';
 import { repositories } from '@repositories/mockRepository';
@@ -18,40 +18,62 @@ export default function HomeScreen() {
   const { isDesktop } = useResponsive();
   const [hideBalance, setHideBalance] = useState(false);
   const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletError, setWalletError] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [services, setServices] = useState<Service[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
   const [announcements, setAnnouncements] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    async function load() {
+    let cancelled = false;
+
+    async function loadWallet() {
       try {
-        const [w, t, s] = await Promise.all([
-          repositories.wallet.getWallet(user?.id || ''),
-          repositories.transaction.getTransactions(user?.id || '', { limit: 5 }),
-          repositories.service.getServices(),
-        ]);
-        setWallet(w);
-        setTransactions(t);
-        setServices(s.slice(0, 6));
+        const w = await repositories.wallet.getWallet(user?.id || '');
+        if (!cancelled) setWallet(w);
       } catch (err: any) {
-        setError(err.message || 'Failed to load dashboard');
+        if (!cancelled) setWalletError(err.message || 'Failed to load wallet');
       } finally {
-        setLoading(false);
+        if (!cancelled) setWalletLoading(false);
       }
     }
-    load();
+
+    async function loadTransactions() {
+      try {
+        const t = await repositories.transaction.getTransactions(user?.id || '', { limit: 5 });
+        if (!cancelled) setTransactions(t);
+      } catch {
+        // non-critical: the section can remain empty
+      } finally {
+        if (!cancelled) setTransactionsLoading(false);
+      }
+    }
+
+    async function loadServices() {
+      try {
+        const s = await repositories.service.getServices();
+        if (!cancelled) setServices(s);
+      } catch {
+        // non-critical: the section can remain empty
+      } finally {
+        if (!cancelled) setServicesLoading(false);
+      }
+    }
+
+    loadWallet();
+    loadTransactions();
+    loadServices();
 
     // Announcements are non-critical, best-effort content - a failure here
     // should never block the rest of the dashboard from loading.
     repositories.admin.getPlatformConfig()
-      .then((config) => setAnnouncements(config.announcements))
-      .catch(() => setAnnouncements([]));
-  }, [user?.id]);
+      .then((config) => { if (!cancelled) setAnnouncements(config.announcements); })
+      .catch(() => { if (!cancelled) setAnnouncements([]); });
 
-  if (loading) return <LoadingState />;
-  if (error) return <ErrorState message={error} onRetry={() => setLoading(true)} />;
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
@@ -68,54 +90,81 @@ export default function HomeScreen() {
         </View>
 
         <GlassCard style={styles.balanceCard} blur>
-          <View style={styles.balanceHeader}>
-            <Text style={[styles.balanceLabel, { color: colors.secondaryText }]}>Wallet Balance</Text>
-            <TouchableOpacity onPress={() => setHideBalance(!hideBalance)}>
-              <Ionicons name={hideBalance ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.secondaryText} />
-            </TouchableOpacity>
-          </View>
-          <Text style={[styles.balance, { color: colors.primaryText }]}>
-            {hideBalance ? '****' : formatCurrency(wallet?.balance || 0)}
-          </Text>
-          <View style={styles.actions}>
-            <TouchableOpacity style={styles.action} onPress={() => router.push('/wallet/fund')}>
-              <View style={[styles.actionIcon, { backgroundColor: colors.primary }]}>
-                <Ionicons name="add" size={20} color={colors.inverseText} />
+          {walletLoading ? (
+            <View>
+              <SkeletonText width="35%" />
+              <SkeletonTitle width="55%" style={{ marginTop: spacing.sm }} />
+              <View style={styles.actions}>
+                {[1, 2, 3, 4].map((i) => (
+                  <View key={i} style={styles.action}>
+                    <SkeletonCircle size={48} />
+                    <SkeletonText width={50} style={{ marginTop: spacing.sm }} />
+                  </View>
+                ))}
               </View>
-              <Text style={[styles.actionLabel, { color: colors.primaryText }]}>Fund</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.action} onPress={() => router.push('/wallet/withdraw')}>
-              <View style={[styles.actionIcon, { backgroundColor: colors.surface }]}>
-                <Ionicons name="arrow-down" size={20} color={colors.primary} />
+            </View>
+          ) : walletError ? (
+            <ErrorState message={walletError} onRetry={() => { setWalletError(''); setWalletLoading(true); }} />
+          ) : (
+            <>
+              <View style={styles.balanceHeader}>
+                <Text style={[styles.balanceLabel, { color: colors.secondaryText }]}>Wallet Balance</Text>
+                <TouchableOpacity onPress={() => setHideBalance(!hideBalance)}>
+                  <Ionicons name={hideBalance ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.secondaryText} />
+                </TouchableOpacity>
               </View>
-              <Text style={[styles.actionLabel, { color: colors.primaryText }]}>Withdraw</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.action} onPress={() => router.push('/wallet/transactions')}>
-              <View style={[styles.actionIcon, { backgroundColor: colors.surface }]}>
-                <Ionicons name="swap-horizontal" size={20} color={colors.primary} />
+              <Text style={[styles.balance, { color: colors.primaryText }]}>
+                {hideBalance ? '****' : formatCurrency(wallet?.balance || 0)}
+              </Text>
+              <View style={styles.actions}>
+                <TouchableOpacity style={styles.action} onPress={() => router.push('/wallet/fund')}>
+                  <View style={[styles.actionIcon, { backgroundColor: colors.primary }]}>
+                    <Ionicons name="add" size={20} color={colors.inverseText} />
+                  </View>
+                  <Text style={[styles.actionLabel, { color: colors.primaryText }]}>Fund</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.action} onPress={() => router.push('/wallet/withdraw')}>
+                  <View style={[styles.actionIcon, { backgroundColor: colors.surface }]}>
+                    <Ionicons name="arrow-down" size={20} color={colors.primary} />
+                  </View>
+                  <Text style={[styles.actionLabel, { color: colors.primaryText }]}>Withdraw</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.action} onPress={() => router.push('/wallet/transactions')}>
+                  <View style={[styles.actionIcon, { backgroundColor: colors.surface }]}>
+                    <Ionicons name="swap-horizontal" size={20} color={colors.primary} />
+                  </View>
+                  <Text style={[styles.actionLabel, { color: colors.primaryText }]}>History</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.action} onPress={() => router.push('/services/smm')}>
+                  <View style={[styles.actionIcon, { backgroundColor: colors.surface }]}>
+                    <Ionicons name="people" size={20} color={colors.primary} />
+                  </View>
+                  <Text style={[styles.actionLabel, { color: colors.primaryText }]}>SMM</Text>
+                </TouchableOpacity>
               </View>
-              <Text style={[styles.actionLabel, { color: colors.primaryText }]}>History</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.action} onPress={() => router.push('/services/smm')}>
-              <View style={[styles.actionIcon, { backgroundColor: colors.surface }]}>
-                <Ionicons name="people" size={20} color={colors.primary} />
-              </View>
-              <Text style={[styles.actionLabel, { color: colors.primaryText }]}>SMM</Text>
-            </TouchableOpacity>
-          </View>
+            </>
+          )}
         </GlassCard>
 
         <AnnouncementMarquee announcements={announcements} />
 
         <SectionHeader title="Services" action="View All" onAction={() => router.push('/(tabs)/services')} />
         <View style={styles.servicesGrid}>
-          {services.map((s) => (
-            <ServiceCard key={s.id} item={s} onPress={() => router.push((s.route || '/(tabs)/services') as any)} size={isDesktop ? 'sm' : 'md'} />
-          ))}
+          {servicesLoading
+            ? Array.from({ length: 6 }).map((_, i) => (
+                <View key={i} style={styles.serviceSkeletonWrapper}>
+                  <SkeletonCard style={styles.serviceSkeleton} />
+                </View>
+              ))
+            : services.map((s) => (
+                <ServiceCard key={s.id} item={s} onPress={() => router.push((s.route || '/(tabs)/services') as any)} size={isDesktop ? 'sm' : 'md'} />
+              ))}
         </View>
 
         <SectionHeader title="Recent Transactions" action="See All" onAction={() => router.push('/wallet/transactions')} />
-        {transactions.length === 0 ? (
+        {transactionsLoading ? (
+          <SkeletonList count={3} />
+        ) : transactions.length === 0 ? (
           <EmptyState icon="receipt-outline" title="No transactions yet" description="Your recent activity will appear here" />
         ) : (
           transactions.map((t) => <TransactionCard key={t.id} transaction={t} onPress={() => router.push(`/wallet/transaction/${t.id}`)} />)
@@ -205,5 +254,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     marginHorizontal: -spacing.xs,
     marginBottom: spacing.xl,
+  },
+  serviceSkeletonWrapper: {
+    width: '50%',
+    padding: spacing.xs,
+  },
+  serviceSkeleton: {
+    height: 120,
   },
 });

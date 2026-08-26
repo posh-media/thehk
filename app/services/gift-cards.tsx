@@ -187,7 +187,7 @@ export default function GiftCardsScreen() {
           <PaymentBottomSheet
             visible={showPaymentSheet}
             onClose={() => setShowPaymentSheet(false)}
-            onConfirm={handleConfirm}
+            onConfirm={({ useCashback }) => handleConfirm(useCashback)}
             loading={submitting}
             title={`${selected.brandName} Gift Card`}
             summaryRows={[

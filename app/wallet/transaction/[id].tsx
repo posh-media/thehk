@@ -75,11 +75,11 @@ export default function TransactionDetailScreen() {
         {transaction.status === 'successful' && (
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => router.push(`/receipts/generate?transactionId=${transaction.id}&amount=${transaction.amount}` as any)}
+            onPress={() => router.push(`/receipts/transaction/${transaction.id}` as any)}
             style={[styles.receipt, { backgroundColor: colors.surface }]}
           >
             <Ionicons name="receipt-outline" size={20} color={colors.primary} />
-            <Text style={[styles.receiptText, { color: colors.primaryText }]}>Generate Receipt</Text>
+            <Text style={[styles.receiptText, { color: colors.primaryText }]}>View Receipt</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.mutedText} />
           </TouchableOpacity>
         )}

@@ -40,6 +40,10 @@ export class ReloadlyProvider implements AirtimeDataProvider {
   name = 'reloadly';
   private client: ReloadlyClient;
 
+  isConfigured(): boolean {
+    return this.client.isConfigured();
+  }
+
   constructor(clientId: string, clientSecret: string, isSandbox = false) {
     const baseUrl = isSandbox ? 'https://topups-sandbox.reloadly.com' : 'https://topups.reloadly.com';
     this.client = new ReloadlyClient(clientId, clientSecret, baseUrl, baseUrl);

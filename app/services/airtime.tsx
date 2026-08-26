@@ -119,14 +119,6 @@ export default function AirtimeScreen() {
             <Text style={[styles.balanceValue, { color: colors.primaryText }]}>{balance !== null ? formatCurrency(balance) : '—'}</Text>
           </View>
 
-          <GlassSelect
-            label="Network"
-            options={operatorOptions}
-            value={operatorId}
-            onSelect={setOperatorId}
-            placeholder={loading ? 'Loading networks...' : 'Select network'}
-            leftIcon="cellular"
-          />
           <GlassInput
             label="Phone Number"
             value={phone}
@@ -138,6 +130,14 @@ export default function AirtimeScreen() {
             containerStyle={styles.input}
           />
           {detecting && <Text style={[styles.hint, { color: colors.secondaryText }]}>Detecting network…</Text>}
+          <GlassSelect
+            label={detecting ? 'Detected Network' : 'Network'}
+            options={operatorOptions}
+            value={operatorId}
+            onSelect={setOperatorId}
+            placeholder={loading ? 'Loading networks...' : 'Select or detect network'}
+            leftIcon="cellular"
+          />
           <GlassInput
             label="Amount"
             value={amount}

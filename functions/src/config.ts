@@ -2,6 +2,12 @@ import * as functions from 'firebase-functions';
 
 export const APP_ENV = process.env.APP_ENV || functions.config().thehk?.env || 'development';
 
+// Provider routing: set AIRTIME_DATA_PROVIDER / BILL_PROVIDER env vars to
+// switch implementations without changing service code. Only Reloadly is
+// wired today.
+export const AIRTIME_DATA_PROVIDER = process.env.AIRTIME_DATA_PROVIDER || 'reloadly';
+export const BILL_PROVIDER = process.env.BILL_PROVIDER || 'reloadly';
+
 export const SECRETS = {
   paystack: {
     secretKey: process.env.PAYSTACK_SECRET_KEY || '',

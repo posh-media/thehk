@@ -8,6 +8,12 @@ export type TransactionStatus = 'pending' | 'processing' | 'successful' | 'faile
 export type PaymentStatus = 'pending' | 'processing' | 'successful' | 'failed' | 'abandoned';
 export type PaymentProvider = 'paystack' | 'korapay' | 'flutterwave';
 
+export interface UserPreferences {
+  emailNotification: boolean;
+  pushNotification: boolean;
+  appearance: 'dark' | 'light' | 'system';
+}
+
 export interface User {
   id: string;
   email: string;
@@ -19,6 +25,7 @@ export interface User {
   photoUrl: string | null;
   country: string | null;
   dateOfBirth: string | null;
+  preferences: UserPreferences;
   role: 'user' | 'seller' | 'admin' | 'support';
   isVerified: boolean;
   referralCode: string;
@@ -112,7 +119,7 @@ export interface PointsBalance {
   updatedAt: string;
 }
 
-export type PointsTransactionType = 'wallet_conversion' | 'referral_conversion' | 'redeemed' | 'adjustment';
+export type PointsTransactionType = 'wallet_conversion' | 'referral_conversion' | 'redeemed' | 'adjustment' | 'signup_bonus';
 
 export interface PointsTransaction {
   id: string;
@@ -221,6 +228,9 @@ export interface AdminPlatformConfig {
   announcements: string[];
   tutorials: AdminTutorial[];
   tips: string[];
+  airtimeProvider?: 'reloadly' | 'owlet' | string;
+  dataProvider?: 'reloadly' | 'owlet' | string;
+  billProvider?: 'reloadly' | string;
   updatedAt: string;
 }
 

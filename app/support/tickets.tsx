@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
-import { GlassCard, Header, StatusBadge, LoadingState, ErrorState } from '@components';
+import { GlassCard, Header, StatusBadge, SkeletonList, ErrorState } from '@components';
 import { SupportTicket } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 import { useAuthStore } from '@stores/authStore';
@@ -39,7 +39,14 @@ export default function TicketsScreen() {
     load();
   }, [retry, user?.id]);
 
-  if (loading) return <LoadingState />;
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header title="My Tickets" />
+        <SkeletonList count={5} />
+      </View>
+    );
+  }
   if (error) return <ErrorState message={error} onRetry={() => { setRetry((r) => r + 1); setLoading(true); setError(''); }} />;
 
   return (

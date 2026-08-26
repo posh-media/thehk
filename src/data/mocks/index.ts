@@ -32,6 +32,11 @@ export const mockUser: User = {
   photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop',
   country: 'Nigeria',
   dateOfBirth: '1995-05-12',
+  preferences: {
+    emailNotification: true,
+    pushNotification: true,
+    appearance: 'system',
+  },
   role: 'user',
   isVerified: true,
   createdAt: '2023-01-15T10:00:00Z',
@@ -190,6 +195,7 @@ export const mockServices: Service[] = [
   { id: 'svc-virtual', categoryId: 'cat-virtual', name: 'Virtual Numbers', description: 'Virtual numbers for verification', icon: 'call', isActive: true, route: '/services/virtual-numbers' },
   { id: 'svc-gaming', categoryId: 'cat-gaming', name: 'Gaming', description: 'Top up game accounts and credits', icon: 'game-controller', isActive: true, route: '/services/gaming' },
   { id: 'svc-tech', categoryId: 'cat-tech', name: 'Tech Tools', description: 'Premium software accounts', icon: 'laptop', isActive: true, route: '/marketplace' },
+  { id: 'svc-bankgen', categoryId: 'cat-bills', name: 'Bank Gen', description: 'Generate custom bank receipts', icon: 'receipt', isActive: true, route: '/receipts/generate' },
 ];
 
 export const mockSocialMediaServices: SocialMediaService[] = [
