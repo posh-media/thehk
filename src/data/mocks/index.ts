@@ -183,19 +183,33 @@ export const mockServiceCategories: ServiceCategory[] = [
   { id: 'cat-giftcards', name: 'Gift Cards', icon: 'gift', color: '#8B5CF6', description: 'Buy and sell gift cards' },
   { id: 'cat-virtual', name: 'Virtual Numbers', icon: 'call', color: '#10B981', description: 'Get virtual phone numbers' },
   { id: 'cat-gaming', name: 'Gaming', icon: 'game-controller', color: '#EF4444', description: 'Game credits and subscriptions' },
-  { id: 'cat-tech', name: 'Tech Tools', icon: 'laptop', color: '#6B7280', description: 'Software accounts and tools' },
+  { id: 'cat-tools', name: 'Tools', icon: 'laptop', color: '#6B7280', description: 'Software accounts and tools' },
+  { id: 'cat-bankgen', name: 'Bank Gen', icon: 'receipt', color: '#14B8A6', description: 'Generate custom bank receipts' },
+  { id: 'cat-upcoming', name: 'Upcoming', icon: 'rocket', color: '#64748B', description: 'New services coming soon' },
 ];
 
 export const mockServices: Service[] = [
-  { id: 'svc-airtime', categoryId: 'cat-airtime', name: 'Airtime Top-up', description: 'Recharge any mobile network', icon: 'phone-portrait', isActive: true, route: '/services/airtime' },
-  { id: 'svc-data', categoryId: 'cat-data', name: 'Data Bundle', description: 'Buy mobile internet data', icon: 'wifi', isActive: true, route: '/services/data' },
-  { id: 'svc-bills', categoryId: 'cat-bills', name: 'Bill Payments', description: 'Pay utility and cable bills', icon: 'receipt', isActive: true, route: '/services/bills' },
-  { id: 'svc-smm', categoryId: 'cat-smm', name: 'Social Media', description: 'Boost followers and engagement', icon: 'people', isActive: true, route: '/services/smm' },
-  { id: 'svc-giftcards', categoryId: 'cat-giftcards', name: 'Gift Cards', description: 'Trade gift cards securely', icon: 'gift', isActive: true, route: '/services/gift-cards' },
-  { id: 'svc-virtual', categoryId: 'cat-virtual', name: 'Virtual Numbers', description: 'Virtual numbers for verification', icon: 'call', isActive: true, route: '/services/virtual-numbers' },
-  { id: 'svc-gaming', categoryId: 'cat-gaming', name: 'Gaming', description: 'Top up game accounts and credits', icon: 'game-controller', isActive: true, route: '/services/gaming' },
-  { id: 'svc-tech', categoryId: 'cat-tech', name: 'Tech Tools', description: 'Premium software accounts', icon: 'laptop', isActive: true, route: '/marketplace' },
-  { id: 'svc-bankgen', categoryId: 'cat-bills', name: 'Bank Gen', description: 'Generate custom bank receipts', icon: 'receipt', isActive: true, route: '/receipts/generate' },
+  // Core / popular services (implemented, visible, popular)
+  { id: 'svc-airtime', categoryId: 'cat-airtime', name: 'Buy Airtime', description: 'Recharge any mobile network', icon: 'phone-portrait', isActive: true, visible: true, implemented: true, isPopular: true, sortOrder: 1, route: '/services/airtime' },
+  { id: 'svc-data', categoryId: 'cat-data', name: 'Do Sub', description: 'Buy mobile internet data', icon: 'wifi', isActive: true, visible: true, implemented: true, isPopular: true, sortOrder: 2, route: '/services/data' },
+  { id: 'svc-bills', categoryId: 'cat-bills', name: 'Pay Bills', description: 'Pay utility and cable bills', icon: 'receipt', isActive: true, visible: true, implemented: true, isPopular: true, sortOrder: 3, route: '/services/bills' },
+  { id: 'svc-smm', categoryId: 'cat-smm', name: 'SMM', description: 'Boost followers and engagement', icon: 'people', isActive: true, visible: true, implemented: true, isPopular: true, sortOrder: 4, route: '/services/smm' },
+  { id: 'svc-giftcards', categoryId: 'cat-giftcards', name: 'Gift Cards', description: 'Trade gift cards securely', icon: 'gift', isActive: true, visible: true, implemented: true, isPopular: true, sortOrder: 5, route: '/services/gift-cards' },
+  { id: 'svc-bankgen', categoryId: 'cat-bankgen', name: 'Bank Gen', description: 'Generate custom bank receipts', icon: 'receipt', isActive: true, visible: true, implemented: true, isPopular: true, sortOrder: 6, route: '/receipts/banks' },
+
+  // Existing but not promoted to the Home / Popular section
+  { id: 'svc-virtual', categoryId: 'cat-virtual', name: 'Virtual Numbers', description: 'Virtual numbers for verification', icon: 'call', isActive: true, visible: true, implemented: true, sortOrder: 7, route: '/services/virtual-numbers' },
+  { id: 'svc-gaming', categoryId: 'cat-gaming', name: 'Gaming', description: 'Top up game accounts and credits', icon: 'game-controller', isActive: true, visible: true, implemented: true, sortOrder: 8, route: '/services/gaming' },
+  { id: 'svc-logs-market', categoryId: 'cat-tools', name: 'Logs Market', description: 'Accounts, logs and digital goods', icon: 'document-text', isActive: true, visible: true, implemented: true, sortOrder: 9, route: '/(tabs)/marketplace' },
+
+  // Upcoming services: visible, not implemented, will show Coming Soon
+  { id: 'svc-qr', categoryId: 'cat-upcoming', name: 'QR Generator', description: 'Generate custom QR codes', icon: 'qr-code', isActive: true, visible: true, implemented: false, sortOrder: 10, route: '/(tabs)/services' },
+  { id: 'svc-link', categoryId: 'cat-upcoming', name: 'Link Shortener', description: 'Shorten and manage links', icon: 'link', isActive: true, visible: true, implemented: false, sortOrder: 11, route: '/(tabs)/services' },
+  { id: 'svc-scripts', categoryId: 'cat-upcoming', name: 'Scripts Market', description: 'Buy and sell scripts', icon: 'code-slash', isActive: true, visible: true, implemented: false, sortOrder: 12, route: '/(tabs)/services' },
+  { id: 'svc-formats', categoryId: 'cat-upcoming', name: 'Formats', description: 'Courses and learning resources', icon: 'school', isActive: true, visible: true, implemented: false, sortOrder: 13, route: '/(tabs)/services' },
+  { id: 'svc-hacked-apps', categoryId: 'cat-upcoming', name: 'Hacked Apps', description: 'Modified applications', icon: 'cube', isActive: true, visible: true, implemented: false, sortOrder: 14, route: '/(tabs)/services' },
+  { id: 'svc-flash-emails', categoryId: 'cat-upcoming', name: 'Flash Emails', description: 'Temporary email addresses', icon: 'mail', isActive: true, visible: true, implemented: false, sortOrder: 15, route: '/(tabs)/services' },
+  { id: 'svc-doc-edit', categoryId: 'cat-upcoming', name: 'Doc Edit', description: 'Document editing services', icon: 'create', isActive: true, visible: true, implemented: false, sortOrder: 16, route: '/(tabs)/services' },
 ];
 
 export const mockSocialMediaServices: SocialMediaService[] = [
@@ -236,8 +250,8 @@ const productImages = {
 export const mockProducts: Product[] = [
   { id: 'prod-001', name: 'Netflix Premium 4K', category: 'Streaming', description: '1-month shared Netflix Premium 4K UHD account. Supports 4 screens.', images: [productImages.netflix], type: 'Account', yearCreated: '2023', warranty: '30 days', accountLevel: 'Premium', shortDescription: '4K UHD shared account' },
   { id: 'prod-002', name: 'Spotify Family Plan', category: 'Streaming', description: 'Spotify Premium family slot. 1 month access.', images: [productImages.spotify], type: 'Slot', yearCreated: '2024', warranty: '30 days', accountLevel: 'Premium', shortDescription: 'Family plan slot' },
-  { id: 'prod-003', name: 'ChatGPT Plus Account', category: 'Tech Tools', description: 'Full ChatGPT Plus account with GPT-4 access. 1 month.', images: [productImages.chatgpt], type: 'Account', yearCreated: '2024', warranty: '30 days', accountLevel: 'Plus', shortDescription: 'GPT-4 enabled' },
-  { id: 'prod-004', name: 'Canva Pro Lifetime', category: 'Tech Tools', description: 'Canva Pro education account. Long-term warranty.', images: [productImages.canva], type: 'Account', yearCreated: '2024', warranty: '1 year', accountLevel: 'Pro', shortDescription: 'Lifetime Pro access' },
+  { id: 'prod-003', name: 'ChatGPT Plus Account', category: 'Tools', description: 'Full ChatGPT Plus account with GPT-4 access. 1 month.', images: [productImages.chatgpt], type: 'Account', yearCreated: '2024', warranty: '30 days', accountLevel: 'Plus', shortDescription: 'GPT-4 enabled' },
+  { id: 'prod-004', name: 'Canva Pro Lifetime', category: 'Tools', description: 'Canva Pro education account. Long-term warranty.', images: [productImages.canva], type: 'Account', yearCreated: '2024', warranty: '1 year', accountLevel: 'Pro', shortDescription: 'Lifetime Pro access' },
   { id: 'prod-005', name: 'Steam Wallet $50', category: 'Gaming', description: 'Steam wallet gift code worth $50 USD.', images: [productImages.steam], type: 'Code', yearCreated: '2024', warranty: 'N/A', accountLevel: 'N/A', shortDescription: 'Global USD code' },
   { id: 'prod-006', name: 'PlayStation Plus Extra', category: 'Gaming', description: 'PSN Extra subscription. 3 months.', images: [productImages.psn], type: 'Account', yearCreated: '2024', warranty: '90 days', accountLevel: 'Extra', shortDescription: '3 months subscription' },
 ];
@@ -295,12 +309,22 @@ export const mockTutorials: Tutorial[] = [
 ];
 
 export const mockBanks: Bank[] = [
-  { id: 'bank-001', name: 'Kuda Bank', code: '50211', logoUrl: 'https://logo.clearbit.com/kuda.com' },
-  { id: 'bank-002', name: 'Access Bank', code: '044', logoUrl: 'https://logo.clearbit.com/accessbankplc.com' },
-  { id: 'bank-003', name: 'Guaranty Trust Bank', code: '058', logoUrl: 'https://logo.clearbit.com/gtbank.com' },
-  { id: 'bank-004', name: 'First Bank of Nigeria', code: '011', logoUrl: 'https://logo.clearbit.com/firstbanknigeria.com' },
-  { id: 'bank-005', name: 'United Bank for Africa', code: '033', logoUrl: 'https://logo.clearbit.com/ubagroup.com' },
-  { id: 'bank-006', name: 'Zenith Bank', code: '057', logoUrl: 'https://logo.clearbit.com/zenithbank.com' },
-  { id: 'bank-007', name: 'Fidelity Bank', code: '070', logoUrl: 'https://logo.clearbit.com/fidelitybank.ng' },
-  { id: 'bank-008', name: 'Union Bank', code: '032', logoUrl: 'https://logo.clearbit.com/unionbankng.com' },
+  // OPay is the first dedicated bank-gen receipt template.
+  {
+    id: 'bank-opay',
+    name: 'OPay',
+    code: 'OPAY',
+    logoAsset: require('../../assets/images/bank-logos/opay.jpg'),
+    implemented: true,
+    receiptTemplate: 'opay',
+  },
+  { id: 'bank-001', name: 'Kuda Bank', code: '50211', logoAsset: require('../../assets/images/bank-logos/kuda.png'), implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-005', name: 'United Bank for Africa', code: '033', logoAsset: require('../../assets/images/bank-logos/uba.webp'), implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-002', name: 'Access Bank', code: '044', logoUrl: 'https://logo.clearbit.com/accessbankplc.com', implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-003', name: 'Guaranty Trust Bank', code: '058', logoUrl: 'https://logo.clearbit.com/gtbank.com', implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-004', name: 'First Bank of Nigeria', code: '011', logoUrl: 'https://logo.clearbit.com/firstbanknigeria.com', implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-006', name: 'Zenith Bank', code: '057', logoUrl: 'https://logo.clearbit.com/zenithbank.com', implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-007', name: 'Fidelity Bank', code: '070', logoUrl: 'https://logo.clearbit.com/fidelitybank.ng', implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-008', name: 'Union Bank', code: '032', logoUrl: 'https://logo.clearbit.com/unionbankng.com', implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-palmpay', name: 'PalmPay', code: 'PALMPAY', logoAsset: require('../../assets/images/bank-logos/palmpay.png'), implemented: false, receiptTemplate: 'generic' },
 ];

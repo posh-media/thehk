@@ -10,6 +10,7 @@ import { useAuthStore } from '@stores/authStore';
 import { repositories } from '@repositories/mockRepository';
 import { Wallet, Transaction, Service } from '@/types/domain';
 import { formatCurrency } from '@lib/formatters';
+import { openService } from '@lib/serviceNavigation';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -156,9 +157,13 @@ export default function HomeScreen() {
                   <SkeletonCard style={styles.serviceSkeleton} />
                 </View>
               ))
-            : services.map((s) => (
-                <ServiceCard key={s.id} item={s} onPress={() => router.push((s.route || '/(tabs)/services') as any)} size={isDesktop ? 'sm' : 'md'} />
-              ))}
+            : services
+                .filter((s) => s.isPopular)
+                .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                .slice(0, isDesktop ? 8 : 6)
+                .map((s) => (
+                  <ServiceCard key={s.id} item={s} onPress={() => openService(router, s)} size={isDesktop ? 'sm' : 'md'} />
+                ))}
         </View>
 
         <SectionHeader title="Recent Transactions" action="See All" onAction={() => router.push('/wallet/transactions')} />

@@ -3,9 +3,10 @@ import * as functions from 'firebase-functions';
 export const APP_ENV = process.env.APP_ENV || functions.config().thehk?.env || 'development';
 
 // Provider routing: set AIRTIME_DATA_PROVIDER / BILL_PROVIDER env vars to
-// switch implementations without changing service code. Only Reloadly is
-// wired today.
-export const AIRTIME_DATA_PROVIDER = process.env.AIRTIME_DATA_PROVIDER || 'reloadly';
+// switch implementations without changing service code. VTU.ng is the
+// default airtime/data provider in this phase.
+export const AIRTIME_DATA_PROVIDER = process.env.AIRTIME_DATA_PROVIDER || 'vtung';
+export const DATA_PROVIDER = process.env.DATA_PROVIDER || 'vtung';
 export const BILL_PROVIDER = process.env.BILL_PROVIDER || 'reloadly';
 
 export const SECRETS = {
@@ -27,6 +28,12 @@ export const SECRETS = {
     clientId: process.env.RELOADLY_CLIENT_ID || '',
     clientSecret: process.env.RELOADLY_CLIENT_SECRET || '',
     sandbox: process.env.RELOADLY_SANDBOX === 'true',
+  },
+  vtung: {
+    username: process.env.VTUNG_USERNAME || '',
+    password: process.env.VTUNG_PASSWORD || '',
+    userPin: process.env.VTUNG_USER_PIN || '',
+    apiBaseUrl: process.env.VTUNG_API_BASE_URL || 'https://vtu.ng/wp-json/api/v2',
   },
 };
 

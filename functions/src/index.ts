@@ -18,6 +18,8 @@ import { OwletProvider } from './providers/owletProvider';
 import { ReloadlyGiftCardProvider } from './providers/reloadlyGiftCardProvider';
 import { getAirtimeDataProvider, getDataProvider, getBillProvider } from './providers/providerFactory';
 import { toKobo, SECRETS } from './config';
+import { verifyVtungPayload } from './providers/vtungClient';
+import { processVtungWebhook, reconcileVtungOrder } from './services/vtungWebhookService';
 
 const owletProvider = new OwletProvider(SECRETS.owlet.apiKey, SECRETS.owlet.apiUrl);
 const reloadlyGiftCardProvider = new ReloadlyGiftCardProvider(SECRETS.reloadly.clientId, SECRETS.reloadly.clientSecret, SECRETS.reloadly.sandbox);
@@ -548,6 +550,88 @@ export const payUtilityBill = functions
       return { order };
     } catch (err) {
       throw new functions.https.HttpsError('failed-precondition', (err as Error).message);
+    }
+  });
+
+// --- Phase 3B/3C continuation: VTU.ng webhook and requery ---
+
+export const vtungWebhook = functions
+  .region(REGION)
+  .runWith(RUNTIME_OPTS)
+  .https.onRequest(async (req, res) => {
+    res.set('Content-Type', 'application/json');
+    if (req.method !== 'POST') {
+      res.status(405).send({ processed: false, error: 'Method not allowed' });
+      return;
+    }
+
+    const signature = req.headers['x-signature'] as string | undefined;
+    if (!signature) {
+      res.status(400).send({ processed: false, error: 'Missing X-Signature' });
+      return;
+    }
+
+    if (!SECRETS.vtung.userPin) {
+      res.status(500).send({ processed: false, error: 'VTU.ng user PIN is not configured' });
+      return;
+    }
+
+    const rawPayload = (((req as any).rawBody as Buffer | undefined)?.toString() || JSON.stringify(req.body)) || '{}';
+    if (!verifyVtungPayload(rawPayload, signature, SECRETS.vtung.userPin)) {
+      res.status(403).send({ processed: false, error: 'Invalid signature' });
+      return;
+    }
+
+    try {
+      const result = await processVtungWebhook(rawPayload, signature, SECRETS.vtung.userPin);
+      res.status(200).send(result);
+    } catch (err) {
+      console.error('VTU.ng webhook error:', err);
+      res.status(500).send({ processed: false, error: (err as Error).message });
+    }
+  });
+
+export const requeryAirtimeOrder = functions
+  .region(REGION)
+  .runWith(SOCIAL_RUNTIME_OPTS)
+  .https.onCall(async (data, context) => {
+    const uid = requireAuth(context);
+    const requestId = data?.requestId as string | undefined;
+    if (!requestId) throw new functions.https.HttpsError('invalid-argument', 'requestId is required.');
+
+    const provider = await resolveAirtimeProvider();
+    if (!provider.requeryOrder) {
+      throw new functions.https.HttpsError('failed-precondition', 'Requery is not supported for the active airtime provider.');
+    }
+
+    try {
+      const result = await provider.requeryOrder(requestId);
+      await reconcileVtungOrder(requestId, result);
+      return { result };
+    } catch (err) {
+      throw new functions.https.HttpsError('unavailable', (err as Error).message);
+    }
+  });
+
+export const requeryDataOrder = functions
+  .region(REGION)
+  .runWith(SOCIAL_RUNTIME_OPTS)
+  .https.onCall(async (data, context) => {
+    const uid = requireAuth(context);
+    const requestId = data?.requestId as string | undefined;
+    if (!requestId) throw new functions.https.HttpsError('invalid-argument', 'requestId is required.');
+
+    const provider = await resolveDataProvider();
+    if (!provider.requeryOrder) {
+      throw new functions.https.HttpsError('failed-precondition', 'Requery is not supported for the active data provider.');
+    }
+
+    try {
+      const result = await provider.requeryOrder(requestId);
+      await reconcileVtungOrder(requestId, result);
+      return { result };
+    } catch (err) {
+      throw new functions.https.HttpsError('unavailable', (err as Error).message);
     }
   });
 

@@ -7,11 +7,11 @@ import { spacing, typography, borderRadius } from '@theme/tokens';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const tabs = [
-  { name: 'Home', path: '/(tabs)', icon: 'home', prefixes: ['/(tabs)', '/wallet'] },
+  { name: 'Home', path: '/(tabs)', icon: 'home', prefixes: ['/(tabs)', '/(tabs)/index'] },
   { name: 'Services', path: '/(tabs)/services', icon: 'grid', prefixes: ['/(tabs)/services', '/services'] },
   { name: 'Marketplace', path: '/(tabs)/marketplace', icon: 'cart', prefixes: ['/(tabs)/marketplace', '/marketplace'] },
-  { name: 'Rewards', path: '/(tabs)/rewards', icon: 'gift', prefixes: ['/(tabs)/rewards', '/rewards', '/profile'] },
-  { name: 'Me', path: '/(tabs)/me', icon: 'person', prefixes: ['/(tabs)/me', '/settings', '/social'] },
+  { name: 'Rewards', path: '/(tabs)/rewards', icon: 'gift', prefixes: ['/(tabs)/rewards', '/rewards'] },
+  { name: 'Me', path: '/(tabs)/me', icon: 'person', prefixes: ['/(tabs)/me', '/me', '/settings', '/social', '/profile'] },
 ];
 
 function isTabActive(tab: typeof tabs[0], pathname: string) {
@@ -31,7 +31,7 @@ export function BottomNav() {
         {
           backgroundColor: colors.glassSurface,
           borderColor: colors.glassBorder,
-          paddingBottom: Math.max(insets.bottom, spacing.sm) + spacing.sm,
+          paddingBottom: Math.max(insets.bottom, spacing.sm),
         },
       ]}
     >
@@ -70,8 +70,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
     paddingTop: spacing.sm,
+    paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
     borderWidth: 1,
   },
@@ -85,7 +86,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: borderRadius.full,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
     gap: spacing.xs,
   },
   pillLabel: {

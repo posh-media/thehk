@@ -23,6 +23,7 @@ export interface RemoteDataPlan {
 
 export interface RemoteTopupResult {
   providerTransactionId: string;
+  providerRequestId?: string;
   status: 'successful' | 'processing' | 'failed';
 }
 
@@ -32,8 +33,19 @@ export interface AirtimeDataProvider {
   listOperators(countryCode: string): Promise<RemoteOperator[]>;
   detectOperator(phone: string, countryCode: string): Promise<RemoteOperator | null>;
   getDataPlans(operatorId: string): Promise<RemoteDataPlan[]>;
-  purchaseAirtime(input: { operatorId: string; phone: string; amountNaira: number }): Promise<RemoteTopupResult>;
-  purchaseData(input: { operatorId: string; phone: string; plan: RemoteDataPlan }): Promise<RemoteTopupResult>;
+  purchaseAirtime(input: {
+    operatorId: string;
+    phone: string;
+    amountNaira: number;
+    requestId: string;
+  }): Promise<RemoteTopupResult>;
+  purchaseData(input: {
+    operatorId: string;
+    phone: string;
+    plan: RemoteDataPlan;
+    requestId: string;
+  }): Promise<RemoteTopupResult>;
+  requeryOrder?(requestId: string): Promise<RemoteTopupResult>;
 }
 
 export interface BillCategory {

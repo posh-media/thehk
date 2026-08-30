@@ -90,7 +90,13 @@ export interface Payment {
 }
 
 export type ServiceOrderType = 'social_media' | 'airtime' | 'data' | 'bill' | 'gift_card';
-export type ServiceOrderStatus = 'pending' | 'processing' | 'successful' | 'failed' | 'cancelled';
+export type ServiceOrderStatus =
+  | 'pending'
+  | 'processing'
+  | 'successful'
+  | 'failed'
+  | 'cancelled'
+  | 'refunded';
 
 export interface ServiceOrderRecord {
   id: string;
@@ -107,6 +113,8 @@ export interface ServiceOrderRecord {
   reference: string;
   transactionId: string;
   providerOrderId?: string;
+  providerReference?: string;
+  metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -231,6 +239,9 @@ export interface AdminPlatformConfig {
   airtimeProvider?: 'reloadly' | 'owlet' | string;
   dataProvider?: 'reloadly' | 'owlet' | string;
   billProvider?: 'reloadly' | string;
+  // Future Admin Panel: per-service visibility/rollout overrides. Keys are
+  // service IDs (e.g. 'svc-airtime'). A missing key means "use the default".
+  serviceVisibility?: Record<string, { visible?: boolean; implemented?: boolean; isPopular?: boolean; sortOrder?: number }>;
   updatedAt: string;
 }
 

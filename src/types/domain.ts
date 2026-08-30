@@ -115,6 +115,11 @@ export interface Bank {
   name: string;
   code: string;
   logoUrl?: string;
+  // Local asset module (e.g. require('./assets/...')) for bank logos that
+  // ship with the app. Takes precedence over logoUrl when present.
+  logoAsset?: number;
+  implemented?: boolean;
+  receiptTemplate?: string;
 }
 
 export interface ServiceCategory {
@@ -133,6 +138,19 @@ export interface Service {
   icon: string;
   isActive: boolean;
   route?: string;
+  // Visibility / rollout flags. `isActive` is the legacy visibility flag.
+  // `visible` and `implemented` are the future Admin Panel controls.
+  visible?: boolean;
+  implemented?: boolean;
+  isPopular?: boolean;
+  sortOrder?: number;
+}
+
+export interface ServiceVisibilityOverride {
+  visible?: boolean;
+  implemented?: boolean;
+  isPopular?: boolean;
+  sortOrder?: number;
 }
 
 export interface SocialMediaService {
@@ -428,6 +446,10 @@ export interface AdminPlatformConfig {
   airtimeProvider?: 'reloadly' | 'owlet' | string;
   dataProvider?: 'reloadly' | 'owlet' | string;
   billProvider?: 'reloadly' | string;
+  // Future Admin Panel service visibility overrides. The client merges these
+  // with the static service catalog so services can be hidden/activated
+  // without a deployment.
+  serviceVisibility?: Record<string, ServiceVisibilityOverride>;
   updatedAt: string;
 }
 

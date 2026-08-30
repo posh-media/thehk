@@ -81,7 +81,12 @@ export class ReloadlyProvider implements AirtimeDataProvider {
     }));
   }
 
-  async purchaseAirtime(input: { operatorId: string; phone: string; amountNaira: number }): Promise<RemoteTopupResult> {
+  async purchaseAirtime(input: {
+    operatorId: string;
+    phone: string;
+    amountNaira: number;
+    requestId?: string;
+  }): Promise<RemoteTopupResult> {
     const data = await this.call<{ transactionId: number; status: string }>('/topups', {
       method: 'POST',
       body: JSON.stringify({
@@ -91,10 +96,15 @@ export class ReloadlyProvider implements AirtimeDataProvider {
         recipientPhone: { countryCode: 'NG', number: input.phone },
       }),
     });
-    return { providerTransactionId: String(data.transactionId), status: mapTopupStatus(data.status) };
+    return { providerTransactionId: String(data.transactionId), providerRequestId: input.requestId, status: mapTopupStatus(data.status) };
   }
 
-  async purchaseData(input: { operatorId: string; phone: string; plan: RemoteDataPlan }): Promise<RemoteTopupResult> {
+  async purchaseData(input: {
+    operatorId: string;
+    phone: string;
+    plan: RemoteDataPlan;
+    requestId?: string;
+  }): Promise<RemoteTopupResult> {
     const data = await this.call<{ transactionId: number; status: string }>('/topups', {
       method: 'POST',
       body: JSON.stringify({
@@ -104,7 +114,11 @@ export class ReloadlyProvider implements AirtimeDataProvider {
         recipientPhone: { countryCode: 'NG', number: input.phone },
       }),
     });
-    return { providerTransactionId: String(data.transactionId), status: mapTopupStatus(data.status) };
+    return { providerTransactionId: String(data.transactionId), providerRequestId: input.requestId, status: mapTopupStatus(data.status) };
+  }
+
+  async requeryOrder(): Promise<RemoteTopupResult> {
+    throw new Error('Order requery is not supported by the Reloadly Airtime/Data provider.');
   }
 }
 

@@ -8,7 +8,7 @@ import { GlassCard, ProductCard, SectionHeader, SkeletonList, ErrorState, EmptyS
 import { Listing } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 
-const categories = ['All', 'Streaming', 'Gaming', 'Tech Tools', 'Virtual Numbers', 'Gift Cards'];
+const categories = ['All', 'Socials', 'Gaming', 'Streaming', 'Tools'];
 
 export default function MarketplaceScreen() {
   const { colors } = useTheme();
@@ -40,7 +40,7 @@ export default function MarketplaceScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.inner}>
-          <Text style={[styles.title, { color: colors.primaryText }]}>Marketplace</Text>
+          <Text style={[styles.title, { color: colors.primaryText }]}>Logs Market</Text>
           <SkeletonList count={5} />
         </View>
       </View>
@@ -51,7 +51,7 @@ export default function MarketplaceScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
       <View style={styles.inner}>
-        <Text style={[styles.title, { color: colors.primaryText }]}>Marketplace</Text>
+        <Text style={[styles.title, { color: colors.primaryText }]}>Logs Market</Text>
         <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Ionicons name="search" size={18} color={colors.mutedText} />
           <TextInput

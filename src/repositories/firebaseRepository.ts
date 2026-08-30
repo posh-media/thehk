@@ -37,6 +37,7 @@ import {
   Payment,
   Withdrawal,
   Notification,
+  Service,
   SocialMediaService,
   ServiceOrder,
   NetworkOperator,
@@ -70,6 +71,30 @@ const REGION = 'us-central1';
 function getCallable<T = any, R = any>(name: string) {
   const fn = httpsCallable<T, R>(functions, name, { limitedUseAppCheckTokens: false });
   return fn;
+}
+
+// Merge the static service catalog with optional admin-panel overrides so
+// visibility/rollout can be controlled from the cloud without redeploying
+// the client. Any service missing from the override map keeps its default
+// values. Hidden services are removed from the catalog.
+function applyServiceVisibility(
+  services: Service[],
+  overrides: AdminPlatformConfig['serviceVisibility'] = {}
+): Service[] {
+  return services
+    .map((service) => {
+      const override = overrides?.[service.id];
+      if (!override) return service;
+      return {
+        ...service,
+        visible: override.visible !== undefined ? override.visible : service.visible,
+        implemented: override.implemented !== undefined ? override.implemented : service.implemented,
+        isPopular: override.isPopular !== undefined ? override.isPopular : service.isPopular,
+        sortOrder: override.sortOrder !== undefined ? override.sortOrder : service.sortOrder,
+      };
+    })
+    .filter((service) => (service.visible === undefined ? service.isActive !== false : service.visible !== false))
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 }
 
 function mapFirebaseUser(fu: FirebaseUser | null): User | null {
@@ -320,7 +345,12 @@ class FirebaseServiceRepository implements ServiceRepository {
 
   async getServices(categoryId?: string) {
     const { mockServices } = await import('@/data/mocks');
-    return categoryId ? mockServices.filter((s) => s.categoryId === categoryId) : mockServices;
+    // Static defaults define the visible catalog. The `serviceVisibility`
+    // field on `AdminPlatformConfig` is the future override point: when the
+    // admin panel writes visibility/rollout flags, merge them here with
+    // `applyServiceVisibility(mockServices, config.serviceVisibility)`.
+    const services = applyServiceVisibility(mockServices, {});
+    return categoryId ? services.filter((s: Service) => s.categoryId === categoryId) : services;
   }
 
   async getSocialMediaServices(categoryId?: string): Promise<SocialMediaService[]> {
@@ -477,7 +507,17 @@ class MockFallbackSocialProfileRepository {
 }
 
 class MockFallbackMarketplaceRepository {
-  async getListings(): Promise<any[]> { return (await import('@/data/mocks')).mockListings; }
+  async getListings(options?: { search?: string; category?: string }): Promise<any[]> {
+    let listings = (await import('@/data/mocks')).mockListings as any[];
+    if (options?.category) {
+      listings = listings.filter((l) => l.product?.category === options!.category);
+    }
+    if (options?.search) {
+      const q = options.search.toLowerCase();
+      listings = listings.filter((l) => l.product?.name?.toLowerCase().includes(q) || l.product?.category?.toLowerCase().includes(q));
+    }
+    return listings;
+  }
   async getListing(id: string): Promise<any | null> { return (await import('@/data/mocks')).mockListings.find((l) => l.id === id) || null; }
   async createListing(): Promise<any> { throw new Error('Create listing not yet implemented in Phase 2'); }
   async getMyListings(): Promise<any[]> { return []; }

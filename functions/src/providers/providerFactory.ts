@@ -1,21 +1,21 @@
 import { AirtimeDataProvider, BillProvider } from './utilityProvider';
 import { ReloadlyProvider } from './reloadlyProvider';
+import { VtungProvider } from './vtungProvider';
 import { ReloadlyUtilityProvider } from './reloadlyUtilityProvider';
 import { SECRETS, APP_ENV } from '../config';
 
-// Provider factory so the backend can switch between Reloadly, a future
-// Owlet integration, or any other Airtime/Data aggregator without touching
-// the order/wallet logic in functions/src/services/utilityService.ts.
-// Only Reloadly is wired today because The Owlet does not expose documented
-// Airtime/Data endpoints (verified at https://the-owlet.com/api).
+// Provider factory so the backend can switch between VTU.ng, Reloadly, a
+// future Owlet integration, or any other Airtime/Data aggregator without
+// touching the order/wallet logic in functions/src/services/utilityService.ts.
+// VTU.ng is the default airtime/data provider in this phase.
 
-type AirtimeDataProviderName = 'reloadly' | 'owlet';
+type AirtimeDataProviderName = 'vtung' | 'reloadly' | 'owlet';
 type BillProviderName = 'reloadly';
 
 const envAirtimeProvider: AirtimeDataProviderName =
-  (process.env.AIRTIME_DATA_PROVIDER as AirtimeDataProviderName) || 'reloadly';
+  (process.env.AIRTIME_DATA_PROVIDER as AirtimeDataProviderName) || 'vtung';
 const envDataProvider: AirtimeDataProviderName =
-  (process.env.DATA_PROVIDER as AirtimeDataProviderName) || 'reloadly';
+  (process.env.DATA_PROVIDER as AirtimeDataProviderName) || 'vtung';
 const envBillProvider: BillProviderName =
   (process.env.BILL_PROVIDER as BillProviderName) || 'reloadly';
 
@@ -23,6 +23,12 @@ const reloadlyProvider = new ReloadlyProvider(
   SECRETS.reloadly.clientId,
   SECRETS.reloadly.clientSecret,
   SECRETS.reloadly.sandbox
+);
+
+const vtungProvider = new VtungProvider(
+  SECRETS.vtung.username,
+  SECRETS.vtung.password,
+  SECRETS.vtung.apiBaseUrl
 );
 
 const reloadlyBillProvider = new ReloadlyUtilityProvider(
@@ -34,14 +40,14 @@ const reloadlyBillProvider = new ReloadlyUtilityProvider(
 function resolveAirtimeProviderName(
   requested?: AirtimeDataProviderName | string | null
 ): AirtimeDataProviderName {
-  if (requested === 'owlet' || requested === 'reloadly') return requested;
+  if (requested === 'vtung' || requested === 'owlet' || requested === 'reloadly') return requested;
   return envAirtimeProvider;
 }
 
 function resolveDataProviderName(
   requested?: AirtimeDataProviderName | string | null
 ): AirtimeDataProviderName {
-  if (requested === 'owlet' || requested === 'reloadly') return requested;
+  if (requested === 'vtung' || requested === 'owlet' || requested === 'reloadly') return requested;
   return envDataProvider;
 }
 
@@ -57,6 +63,11 @@ export function getAirtimeDataProvider(
 ): AirtimeDataProvider {
   const name = resolveAirtimeProviderName(requested);
   switch (name) {
+    case 'vtung':
+      if (!vtungProvider.isConfigured()) {
+        throw new Error('Airtime/Data provider (VTU.ng) is not configured.');
+      }
+      return vtungProvider;
     case 'reloadly':
       if (!reloadlyProvider.isConfigured()) {
         throw new Error('Airtime/Data provider (Reloadly) is not configured.');
@@ -68,12 +79,12 @@ export function getAirtimeDataProvider(
       throw new Error('Airtime/Data provider (Owlet) is not available. No documented API exists at this time.');
     default:
       if (APP_ENV !== 'production') {
-        console.warn(`Unknown Airtime/Data provider "${name}", falling back to Reloadly.`);
+        console.warn(`Unknown Airtime/Data provider "${name}", falling back to VTU.ng.`);
       }
-      if (!reloadlyProvider.isConfigured()) {
-        throw new Error('Airtime/Data provider (Reloadly) is not configured.');
+      if (!vtungProvider.isConfigured()) {
+        throw new Error('Airtime/Data provider (VTU.ng) is not configured.');
       }
-      return reloadlyProvider;
+      return vtungProvider;
   }
 }
 

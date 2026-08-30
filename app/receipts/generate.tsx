@@ -31,6 +31,7 @@ export default function GenerateReceiptScreen() {
   const params = useLocalSearchParams();
   const transactionId = (params.transactionId as string) || undefined;
   const prefilledAmount = (params.amount as string) || '';
+  const bankId = (params.bankId as string) || undefined;
 
   const [banks, setBanks] = useState<Bank[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +96,12 @@ export default function GenerateReceiptScreen() {
   }, []);
 
   useEffect(() => {
+    if (!bankId || banks.length === 0) return;
+    const bank = banks.find((b) => b.id === bankId);
+    if (bank) setReceiverBank(bank);
+  }, [bankId, banks]);
+
+  useEffect(() => {
     if (!receiverBank || receiverAccount.length !== 10) return;
     let cancelled = false;
     async function verify() {
@@ -129,7 +136,7 @@ export default function GenerateReceiptScreen() {
     setSubmitting(true);
     try {
       const result = await repositories.receipt.purchaseBankGenReceipt({
-        amount: Number(amount),
+        amount: Number(amount) * 100, // convert receipt amount from naira to kobo
         senderName,
         senderAccountNumber: senderAccount || undefined,
         receiverBankName: receiverBank.name,

@@ -25,9 +25,10 @@ const DEFAULT_CONFIG: AdminPlatformConfig = {
     'Share your referral link - you earn a reward once your friend funds their wallet for the first time.',
     'Always double-check the recipient details before confirming a payment.',
   ],
-  airtimeProvider: 'reloadly',
-  dataProvider: 'reloadly',
+  airtimeProvider: 'vtung',
+  dataProvider: 'vtung',
   billProvider: 'reloadly',
+  serviceVisibility: {},
   updatedAt: new Date().toISOString(),
 };
 

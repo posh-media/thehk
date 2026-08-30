@@ -1,17 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
 import { GlassCard, ServiceCard, SectionHeader, SkeletonList, ErrorState } from '@components';
-import { Service, ServiceCategory } from '@/types/domain';
+import { Service } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
+import { openService } from '@lib/serviceNavigation';
 
 export default function ServicesScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -20,8 +20,7 @@ export default function ServicesScreen() {
   useEffect(() => {
     async function load() {
       try {
-        const [c, s] = await Promise.all([repositories.service.getCategories(), repositories.service.getServices()]);
-        setCategories(c);
+        const s = await repositories.service.getServices();
         setServices(s);
       } catch (err: any) {
         setError(err.message || 'Failed to load services');
@@ -44,7 +43,16 @@ export default function ServicesScreen() {
   }
   if (error) return <ErrorState message={error} onRetry={() => setLoading(true)} />;
 
-  const filtered = services.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()));
+  const normalizedSearch = search.toLowerCase();
+
+  const popular = useMemo(
+    () => services.filter((s) => s.isPopular).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)),
+    [services]
+  );
+  const all = useMemo(
+    () => services.filter((s) => s.name.toLowerCase().includes(normalizedSearch)).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)),
+    [services, normalizedSearch]
+  );
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
@@ -61,19 +69,23 @@ export default function ServicesScreen() {
           />
         </View>
 
-        <SectionHeader title="Categories" />
+        <SectionHeader title="Popular Services" />
         <View style={styles.grid}>
-          {categories.map((c) => (
-            <ServiceCard key={c.id} item={c} onPress={() => router.push(`/services/${c.id.replace('cat-', '')}` as any)} />
+          {popular.map((s) => (
+            <ServiceCard key={s.id} item={s} onPress={() => openService(router, s)} />
           ))}
         </View>
 
-        <SectionHeader title="Popular Services" />
+        <SectionHeader title="All Services" />
         <View style={styles.grid}>
-          {filtered.map((s) => (
-            <ServiceCard key={s.id} item={s} onPress={() => router.push(s.route || '/(tabs)/services' as any)} />
+          {all.map((s) => (
+            <ServiceCard key={s.id} item={s} onPress={() => openService(router, s)} />
           ))}
         </View>
+
+        {all.length === 0 && (
+          <Text style={[styles.empty, { color: colors.secondaryText }]}>No services found.</Text>
+        )}
       </View>
     </ScrollView>
   );
@@ -106,5 +118,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     marginHorizontal: -spacing.xs,
     marginBottom: spacing.xl,
+  },
+  empty: {
+    textAlign: 'center',
+    marginTop: spacing.xl,
+    fontSize: typography.sizes.base,
   },
 });

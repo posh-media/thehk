@@ -2,7 +2,8 @@ import { db } from '../admin';
 import { debitWalletForOrder, refundWalletDebit } from './walletService';
 import { spendCashback, awardCashback } from './cashbackService';
 import { generateReference } from '../utils';
-import { ServiceOrderRecord, ServiceOrderType } from '../types';
+import { RemoteTopupResult } from '../providers/utilityProvider';
+import { ServiceOrderRecord, ServiceOrderType, Transaction } from '../types';
 
 function orderRef(id: string) {
   return db.collection('serviceOrders').doc(id);
@@ -35,7 +36,7 @@ interface SubmitServiceOrderInput {
    * others weren't changed in this pass.
    */
   useCashback?: boolean;
-  submit: () => Promise<{ providerTransactionId: string; status: 'successful' | 'processing' | 'failed' }>;
+  submit: () => Promise<RemoteTopupResult>;
 }
 
 /**
@@ -88,6 +89,8 @@ export async function submitServiceOrder(input: SubmitServiceOrderInput): Promis
     status: 'processing',
     reference,
     transactionId: transaction.id,
+    providerReference: input.metadata?.providerReference as string | undefined,
+    metadata: input.metadata,
     createdAt: now,
     updatedAt: now,
   };
@@ -102,6 +105,7 @@ export async function submitServiceOrder(input: SubmitServiceOrderInput): Promis
   try {
     const result = await input.submit();
     order.providerOrderId = result.providerTransactionId;
+    order.providerReference = result.providerRequestId ?? order.providerReference;
     order.status = result.status === 'successful' ? 'successful' : result.status === 'failed' ? 'failed' : 'processing';
     await orderRef(id).set(order);
 
@@ -116,4 +120,35 @@ export async function submitServiceOrder(input: SubmitServiceOrderInput): Promis
   }
 
   return order;
+}
+
+/**
+ * Refunds an existing service order by reading its wallet transaction and
+ * reversing both the wallet debit and any cashback that was spent. Used by
+ * asynchronous provider webhooks (e.g. VTU.ng) when a terminal status is
+ * received after the order was already created.
+ */
+export async function refundServiceOrder(order: ServiceOrderRecord, reason: string): Promise<void> {
+  const txSnap = await db.collection('transactions').doc(order.transactionId).get();
+  if (!txSnap.exists) throw new Error('Wallet transaction for this order was not found.');
+  const tx = txSnap.data() as Transaction;
+
+  const walletDebit = tx.amount;
+  const cashbackUsed = (tx.metadata?.cashbackUsed as number) || 0;
+
+  await refundWalletDebit({
+    userId: order.userId,
+    transactionId: tx.id,
+    amount: walletDebit,
+    reason,
+  });
+
+  if (cashbackUsed > 0) {
+    await awardCashback({
+      userId: order.userId,
+      amountKobo: cashbackUsed,
+      description: `Refund: ${reason}`,
+      relatedOrderId: order.id,
+    });
+  }
 }

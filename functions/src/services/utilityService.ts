@@ -2,6 +2,7 @@ import { AirtimeDataProvider, RemoteOperator, RemoteDataPlan } from '../provider
 import { submitServiceOrder } from './orderService';
 import { toKobo } from '../config';
 import { ServiceOrderRecord } from '../types';
+import { generateReference } from '../utils';
 
 const COUNTRY_CODE = 'NG';
 const OPERATOR_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -69,6 +70,7 @@ export async function placeAirtimeOrder(provider: AirtimeDataProvider, input: Pl
   // provider's local top-up amount, converted to kobo. There is no markup
   // in Phase 3B.
   const amountKobo = toKobo(input.amountNaira);
+  const requestId = generateReference('VTU-AIR');
 
   return submitServiceOrder({
     userId: input.userId,
@@ -79,7 +81,14 @@ export async function placeAirtimeOrder(provider: AirtimeDataProvider, input: Pl
     provider: provider.name,
     link: input.phone,
     amountKobo,
-    submit: () => provider.purchaseAirtime({ operatorId: operator.id, phone: input.phone, amountNaira: input.amountNaira }),
+    metadata: { providerReference: requestId },
+    submit: () =>
+      provider.purchaseAirtime({
+        operatorId: operator.id,
+        phone: input.phone,
+        amountNaira: input.amountNaira,
+        requestId,
+      }),
   });
 }
 
@@ -103,6 +112,7 @@ export async function placeDataOrder(provider: AirtimeDataProvider, input: Place
   if (!plan) throw new Error('Selected data plan is no longer available. Please refresh and try again.');
 
   const amountKobo = toKobo(plan.amountNaira);
+  const requestId = generateReference('VTU-DATA');
 
   return submitServiceOrder({
     userId: input.userId,
@@ -113,6 +123,13 @@ export async function placeDataOrder(provider: AirtimeDataProvider, input: Place
     provider: provider.name,
     link: input.phone,
     amountKobo,
-    submit: () => provider.purchaseData({ operatorId: operator.id, phone: input.phone, plan }),
+    metadata: { providerReference: requestId },
+    submit: () =>
+      provider.purchaseData({
+        operatorId: operator.id,
+        phone: input.phone,
+        plan,
+        requestId,
+      }),
   });
 }

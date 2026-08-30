@@ -6,6 +6,7 @@ import { spacing, typography } from '@theme/tokens';
 import { Header, GlassCard, ServiceCard, LoadingState, ErrorState, SectionHeader } from '@components';
 import { repositories } from '@repositories/mockRepository';
 import { Service, ServiceCategory } from '@/types/domain';
+import { openService } from '@lib/serviceNavigation';
 
 export default function ServiceCategoryScreen() {
   const { colors } = useTheme();
@@ -57,7 +58,7 @@ export default function ServiceCategoryScreen() {
         ) : (
           <View style={styles.grid}>
             {services.map((s) => (
-              <ServiceCard key={s.id} item={s} onPress={() => router.push((s.route as any) || '/(tabs)/services')} />
+              <ServiceCard key={s.id} item={s} onPress={() => openService(router, s)} />
             ))}
           </View>
         )}
