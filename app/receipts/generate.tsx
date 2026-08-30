@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Modal, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ViewShot from 'react-native-view-shot';
@@ -15,23 +15,19 @@ import { GlassCard, GlassButton, GlassInput, Header, LoadingState, PaymentBottom
 import { Bank, ReceiptRecord } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 import { useAuthStore } from '@stores/authStore';
-import { formatCurrency, formatDate } from '@lib/formatters';
+import { formatCurrency, formatDate, formatHkc } from '@lib/formatters';
 
-// Receipt Generator (Phase 4 continuation). Bank account name verification
-// is real, via Paystack's account-resolve endpoint
-// (functions/src/services/bankService.ts) - the same provider already used
-// for wallet funding. The receipt itself is a real Firestore record
-// (functions/src/services/receiptService.ts), and the on-screen receipt
-// card is captured as an image for share/save via react-native-view-shot +
-// expo-sharing (true PDF export was not implemented - see
-// PHASE_4_CONTINUATION_REPORT.md).
+const BANK_GEN_PRICE_NAIRA = 100;
+const BANK_GEN_PRICE_KOBO = BANK_GEN_PRICE_NAIRA * 100;
+const OTHERS_BANK_ID = 'bank-others';
+
 export default function GenerateReceiptScreen() {
   const { colors } = useTheme();
   const { user } = useAuthStore();
   const params = useLocalSearchParams();
   const transactionId = (params.transactionId as string) || undefined;
   const prefilledAmount = (params.amount as string) || '';
-  const bankId = (params.bankId as string) || undefined;
+  const initialBankId = (params.bankId as string) || undefined;
 
   const [banks, setBanks] = useState<Bank[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,20 +38,40 @@ export default function GenerateReceiptScreen() {
 
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [walletBalance, setWalletBalance] = useState(0);
-  const [pointsBalance, setPointsBalance] = useState(0);
+  const [hkcBalance, setHkcBalance] = useState(0);
+  const [ngnBalance, setNgnBalance] = useState(0);
   const [cashbackBalance, setCashbackBalance] = useState(0);
 
   const [amount, setAmount] = useState('');
   const [senderName, setSenderName] = useState(user?.displayName || '');
   const [senderAccount, setSenderAccount] = useState('');
   const [receiverBank, setReceiverBank] = useState<Bank | null>(null);
+  const [customBankName, setCustomBankName] = useState('');
   const [receiverAccount, setReceiverAccount] = useState('');
   const [receiverName, setReceiverName] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState('');
 
   const receiptRef = useRef<React.ElementRef<typeof ViewShot>>(null);
+
+  const allBanks = useMemo<Bank[]>(() => {
+    const others: Bank = {
+      id: OTHERS_BANK_ID,
+      name: 'Others',
+      code: 'OTHERS',
+      category: 'bank',
+      logoAsset: undefined,
+      logoUrl: undefined,
+      implemented: false,
+      receiptTemplate: 'generic',
+    };
+    return [...banks, others];
+  }, [banks]);
+
+  const senderAccountLabel = useMemo(() => {
+    if (!receiverBank || receiverBank.id === OTHERS_BANK_ID) return 'Sender Account Number (optional)';
+    return `Sender ${receiverBank.name} Account Number (optional)`;
+  }, [receiverBank]);
 
   useEffect(() => {
     if (prefilledAmount) setAmount(prefilledAmount);
@@ -65,16 +81,15 @@ export default function GenerateReceiptScreen() {
     async function loadBalances() {
       if (!user) return;
       try {
-        const [wallet, points, cashback] = await Promise.all([
+        const [wallet, hkc, cashback] = await Promise.all([
           repositories.wallet.getWallet(user.id),
-          repositories.rewards.getPointsBalance(),
+          repositories.rewards.getHkcBalance(),
           repositories.cashback.getBalance(),
         ]);
-        setWalletBalance(wallet.balance || 0);
-        setPointsBalance(points.balance || 0);
+        setNgnBalance(wallet.balance || 0);
+        setHkcBalance(hkc.balance || 0);
         setCashbackBalance(cashback.balance || 0);
       } catch (err) {
-        // Non-fatal: the payment sheet will show 0 and the user can still see insufficient balance.
         console.warn('Could not load payment balances:', err);
       }
     }
@@ -96,13 +111,14 @@ export default function GenerateReceiptScreen() {
   }, []);
 
   useEffect(() => {
-    if (!bankId || banks.length === 0) return;
-    const bank = banks.find((b) => b.id === bankId);
+    if (!initialBankId || allBanks.length === 0) return;
+    const bank = allBanks.find((b) => b.id === initialBankId);
     if (bank) setReceiverBank(bank);
-  }, [bankId, banks]);
+  }, [initialBankId, allBanks]);
 
   useEffect(() => {
-    if (!receiverBank || receiverAccount.length !== 10) return;
+    if (!receiverBank || receiverBank.id === OTHERS_BANK_ID) return;
+    if (receiverAccount.length !== 10) return;
     let cancelled = false;
     async function verify() {
       setVerifying(true);
@@ -126,23 +142,27 @@ export default function GenerateReceiptScreen() {
       setError('Please fill in all required fields');
       return;
     }
+    if (receiverBank.id === OTHERS_BANK_ID && !customBankName.trim()) {
+      setError('Please enter the custom bank name');
+      return;
+    }
     setError('');
     setShowPaymentSheet(true);
   }
 
-  async function handleConfirmPayment({ usePoints, useCashback }: { usePoints: boolean; useCashback: boolean }) {
+  async function handleConfirmPayment({ useCashback }: { useCashback: boolean }) {
     if (!receiverBank) return;
+    const bankName = receiverBank.id === OTHERS_BANK_ID ? customBankName.trim() : receiverBank.name;
     setShowPaymentSheet(false);
     setSubmitting(true);
     try {
       const result = await repositories.receipt.purchaseBankGenReceipt({
-        amount: Number(amount) * 100, // convert receipt amount from naira to kobo
+        amount: Number(amount),
         senderName,
         senderAccountNumber: senderAccount || undefined,
-        receiverBankName: receiverBank.name,
+        receiverBankName: bankName,
         receiverAccountNumber: receiverAccount,
         receiverAccountName: receiverName,
-        usePoints,
         useCashback,
       });
       setReceipt(result);
@@ -192,7 +212,7 @@ export default function GenerateReceiptScreen() {
         <GlassCard style={styles.form}>
           <GlassInput label="Amount" value={amount} onChangeText={setAmount} keyboardType="numeric" leftIcon="cash-outline" placeholder="0.00" containerStyle={styles.field} />
           <GlassInput label="Sender Name" value={senderName} onChangeText={setSenderName} leftIcon="person-outline" placeholder="Full name" containerStyle={styles.field} />
-          <GlassInput label="Sender Account Number" value={senderAccount} onChangeText={setSenderAccount} keyboardType="numeric" leftIcon="card-outline" placeholder="Account number (optional)" containerStyle={styles.field} />
+          <GlassInput label={senderAccountLabel} value={senderAccount} onChangeText={setSenderAccount} keyboardType="numeric" leftIcon="card-outline" placeholder="Account number (optional)" containerStyle={styles.field} />
 
           <Text style={[styles.label, { color: colors.secondaryText }]}>Receiver Bank</Text>
           <TouchableOpacity
@@ -202,9 +222,13 @@ export default function GenerateReceiptScreen() {
           >
             {receiverBank ? (
               <>
-                <View style={[styles.bankLogo, { backgroundColor: colors.primaryGlow }]}>
-                  <Text style={[styles.bankInitial, { color: colors.primary }]}>{receiverBank.name.charAt(0)}</Text>
-                </View>
+                {receiverBank.logoAsset || receiverBank.logoUrl ? (
+                  <Image source={receiverBank.logoAsset || { uri: receiverBank.logoUrl }} style={styles.bankLogo} resizeMode="contain" />
+                ) : (
+                  <View style={[styles.bankLogo, { backgroundColor: colors.primaryGlow }]}>
+                    <Text style={[styles.bankInitial, { color: colors.primary }]}>{receiverBank.name.charAt(0)}</Text>
+                  </View>
+                )}
                 <Text style={[styles.bankSelectorText, { color: colors.primaryText }]}>{receiverBank.name}</Text>
               </>
             ) : (
@@ -212,6 +236,17 @@ export default function GenerateReceiptScreen() {
             )}
             <Ionicons name="chevron-down" size={18} color={colors.mutedText} />
           </TouchableOpacity>
+
+          {receiverBank?.id === OTHERS_BANK_ID && (
+            <GlassInput
+              label="Custom Bank Name"
+              value={customBankName}
+              onChangeText={setCustomBankName}
+              leftIcon="business-outline"
+              placeholder="Enter bank name"
+              containerStyle={styles.field}
+            />
+          )}
 
           <GlassInput
             label="Receiver Account Number"
@@ -275,15 +310,13 @@ export default function GenerateReceiptScreen() {
           title="Bank Gen Receipt"
           summaryRows={[
             { label: 'Service', value: 'Bank Receipt Generation' },
-            { label: 'Price', value: '₦100 or 100 HK Points' },
+            { label: 'Price', value: `₦${BANK_GEN_PRICE_NAIRA.toLocaleString()}` },
           ]}
-          totalAmount={10000}
-          walletBalance={walletBalance}
-          pointsBalance={pointsBalance}
+          totalAmount={BANK_GEN_PRICE_KOBO}
+          hkcBalance={hkcBalance}
+          ngnBalance={ngnBalance}
           cashbackBalance={cashbackBalance}
           cashbackEligible={false}
-          allowPointsPayment
-          pointsCost={100}
           confirmLabel="Pay & Generate"
         />
       </View>
@@ -292,16 +325,22 @@ export default function GenerateReceiptScreen() {
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           <Header title="Select Bank" onBack={() => setBankPickerVisible(false)} />
           <ScrollView style={styles.inner}>
-            {banks.map((bank) => (
+            {allBanks.map((bank) => (
               <TouchableOpacity key={bank.id} activeOpacity={0.8} onPress={() => { setReceiverBank(bank); setBankPickerVisible(false); }}>
                 <GlassCard style={styles.bankCard}>
                   <View style={styles.bankRow}>
-                    <View style={[styles.bankLogo, { backgroundColor: colors.primaryGlow }]}>
-                      <Text style={[styles.bankInitial, { color: colors.primary }]}>{bank.name.charAt(0)}</Text>
-                    </View>
+                    {bank.logoAsset || bank.logoUrl ? (
+                      <Image source={bank.logoAsset || { uri: bank.logoUrl }} style={styles.bankLogo} resizeMode="contain" />
+                    ) : (
+                      <View style={[styles.bankLogo, { backgroundColor: colors.primaryGlow }]}>
+                        <Text style={[styles.bankInitial, { color: colors.primary }]}>{bank.name.charAt(0)}</Text>
+                      </View>
+                    )}
                     <View style={styles.bankInfo}>
                       <Text style={[styles.bankName, { color: colors.primaryText }]}>{bank.name}</Text>
-                      <Text style={[styles.bankCode, { color: colors.secondaryText }]}>Bank code: {bank.code}</Text>
+                      {bank.id !== OTHERS_BANK_ID && (
+                        <Text style={[styles.bankCode, { color: colors.secondaryText }]}>Bank code: {bank.code}</Text>
+                      )}
                     </View>
                   </View>
                 </GlassCard>

@@ -1,17 +1,10 @@
 import { db } from '../admin';
 import { ReceiptRecord, Transaction } from '../types';
 import { generateReference } from '../utils';
-import { debitWalletForOrder, refundWalletDebit } from './walletService';
-import { debitPoints } from './pointsService';
-import { spendCashback } from './cashbackService';
+import { BANK_GEN_PRICE_NAIRA, CURRENCY } from '../config';
+import { debitConsumerPayment, refundConsumerPayment } from './walletService';
 
-const BANK_GEN_PRICE_KOBO = 100 * 100; // ₦100
-const BANK_GEN_POINTS_COST = 100; // 100 HK Points
-
-interface PurchaseBankGenReceiptInput extends GenerateReceiptInput {
-  usePoints?: boolean;
-  useCashback?: boolean;
-}
+const BANK_GEN_PRICE_KOBO = BANK_GEN_PRICE_NAIRA * CURRENCY.minorUnit; // ₦100
 
 interface GenerateReceiptInput {
   userId: string;
@@ -24,16 +17,16 @@ interface GenerateReceiptInput {
   receiverAccountName: string;
 }
 
+interface PurchaseBankGenReceiptInput extends GenerateReceiptInput {
+  useCashback?: boolean;
+}
+
 export async function generateReceipt(input: GenerateReceiptInput): Promise<ReceiptRecord> {
   if (!input.amount || input.amount <= 0) throw new Error('A valid amount is required');
   if (!input.senderName || !input.receiverBankName || !input.receiverAccountNumber || !input.receiverAccountName) {
     throw new Error('Sender name, receiver bank, account number and account name are required');
   }
 
-  // If a transaction is referenced, verify it belongs to this user - a
-  // receipt should never be generated referencing someone else's
-  // transaction, even though the amount/details themselves are otherwise
-  // user-supplied for the (non-transactional) manual receipt case.
   if (input.transactionId) {
     const txSnap = await db.collection('transactions').doc(input.transactionId).get();
     const tx = txSnap.data() as Transaction | undefined;
@@ -65,33 +58,34 @@ export async function generateReceipt(input: GenerateReceiptInput): Promise<Rece
 }
 
 export async function purchaseBankGenReceipt(input: PurchaseBankGenReceiptInput): Promise<ReceiptRecord> {
-  if (input.usePoints) {
-    await debitPoints({
+  const reference = generateReference('HK-BG');
+  const description = 'Bank receipt generation';
+
+  const paymentResult = await debitConsumerPayment({
+    userId: input.userId,
+    totalKobo: BANK_GEN_PRICE_KOBO,
+    useCashback: input.useCashback ?? false,
+    description,
+    orderReference: reference,
+    serviceType: 'bank_gen',
+    metadata: { receiverBankName: input.receiverBankName },
+  });
+
+  try {
+    return await generateReceipt(input);
+  } catch (err) {
+    await refundConsumerPayment({
       userId: input.userId,
-      points: BANK_GEN_POINTS_COST,
-      description: 'Bank Gen receipt generation',
-      reference: generateReference('HK-PTS'),
-    });
-  } else {
-    let remaining = BANK_GEN_PRICE_KOBO;
-    if (input.useCashback) {
-      const { spent } = await spendCashback({
-        userId: input.userId,
-        requestedAmountKobo: BANK_GEN_PRICE_KOBO,
-        description: 'Bank Gen receipt generation',
-      });
-      remaining -= spent;
-    }
-    if (remaining > 0) {
-      await debitWalletForOrder({
-        userId: input.userId,
-        amount: remaining,
-        type: 'bank_gen_purchase',
-        description: 'Bank Gen receipt generation',
-      });
-    }
+      hkcUsed: paymentResult.hkcUsed,
+      cashbackUsed: paymentResult.cashbackUsed,
+      ngnUsed: paymentResult.ngnUsed,
+      hkcTransactionId: paymentResult.hkcTransactionId,
+      ngnTransactionId: paymentResult.ngnTransactionId,
+      reason: 'Bank Gen receipt generation failed',
+      orderReference: reference,
+    }).catch(() => undefined);
+    throw err;
   }
-  return generateReceipt(input);
 }
 
 export async function getReceipt(userId: string, receiptId: string): Promise<ReceiptRecord> {

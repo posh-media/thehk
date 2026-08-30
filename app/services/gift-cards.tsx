@@ -32,8 +32,8 @@ export default function GiftCardsScreen() {
   const [denomination, setDenomination] = useState<number | null>(null);
   const [quantity, setQuantity] = useState('1');
   const [recipientEmail, setRecipientEmail] = useState('');
-  const [balance, setBalance] = useState<number | null>(null);
-  const [pointsBalance, setPointsBalance] = useState(0);
+  const [ngnBalance, setNgnBalance] = useState<number | null>(null);
+  const [hkcBalance, setHkcBalance] = useState(0);
   const [cashbackBalance, setCashbackBalance] = useState(0);
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
 
@@ -46,15 +46,15 @@ export default function GiftCardsScreen() {
     if (mode !== 'buy') return;
     async function load() {
       try {
-        const [items, wallet, points, cashback] = await Promise.all([
+        const [items, wallet, hkc, cashback] = await Promise.all([
           repositories.giftCard.getProducts(),
           repositories.wallet.getWallet(user?.id || ''),
-          repositories.rewards.getPointsBalance(),
+          repositories.rewards.getHkcBalance(),
           repositories.cashback.getBalance(),
         ]);
         setProducts(items);
-        setBalance(wallet.balance);
-        setPointsBalance(points.balance);
+        setNgnBalance(wallet.balance);
+        setHkcBalance(hkc.balance);
         setCashbackBalance(cashback.balance);
       } catch (err: any) {
         setLoadError(err.message || 'Unable to load gift cards. The provider may be unavailable.');
@@ -174,12 +174,12 @@ export default function GiftCardsScreen() {
               <Text style={[styles.totalValue, { color: colors.primaryText }]}>{formatCurrency(totalKobo)}</Text>
             </View>
 
-            {totalKobo > 0 && balance !== null && totalKobo > balance && (
-              <Text style={[styles.errorText, { color: colors.error }]}>Insufficient wallet balance</Text>
+            {totalKobo > 0 && ngnBalance !== null && totalKobo > ngnBalance + hkcBalance * 100 && (
+              <Text style={[styles.errorText, { color: colors.error }]}>Insufficient HKC / wallet balance</Text>
             )}
 
             <GlassButton title="Review Order" onPress={() => setShowPaymentSheet(true)} disabled={!isValid} style={styles.button} />
-            {totalKobo > 0 && balance !== null && totalKobo > balance && cashbackBalance < totalKobo - (balance ?? 0) && (
+            {totalKobo > 0 && ngnBalance !== null && totalKobo > ngnBalance + hkcBalance * 100 && (
               <GlassButton title="Fund Wallet" onPress={() => router.push('/wallet/fund')} variant="secondary" style={styles.button} />
             )}
           </GlassCard>
@@ -196,8 +196,8 @@ export default function GiftCardsScreen() {
               { label: 'Recipient', value: recipientEmail },
             ]}
             totalAmount={totalKobo}
-            walletBalance={balance ?? 0}
-            pointsBalance={pointsBalance}
+            hkcBalance={hkcBalance}
+            ngnBalance={ngnBalance ?? 0}
             cashbackBalance={cashbackBalance}
           />
           {formError ? <Text style={[styles.errorText, { color: colors.error }]}>{formError}</Text> : null}

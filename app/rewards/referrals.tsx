@@ -98,7 +98,7 @@ export default function ReferralsScreen() {
               onPress={() => router.push('/rewards/points')}
               style={[styles.convertButton, { backgroundColor: colors.primary }]}
             >
-              <Text style={[styles.convertButtonText, { color: colors.inverseText }]}>Convert to HK Points</Text>
+              <Text style={[styles.convertButtonText, { color: colors.inverseText }]}>Convert to HK Coins</Text>
             </TouchableOpacity>
           )}
         </GlassCard>

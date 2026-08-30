@@ -29,6 +29,11 @@ export function formatCurrency(amountInMinorUnits: number, currency: Currency = 
   return `${symbol}${formatted}`;
 }
 
+// HKC is stored in whole units where 1 HKC = ₦1. `amount` is the HKC count.
+export function formatHkc(amount: number): string {
+  return `${Math.round(amount).toLocaleString('en-NG')} HKC`;
+}
+
 export function formatCompactNumber(value: number): string {
   return Intl.NumberFormat('en-NG', { notation: 'compact' }).format(value);
 }

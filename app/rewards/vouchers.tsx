@@ -6,7 +6,7 @@ import { spacing, typography, borderRadius } from '@theme/tokens';
 import { GlassCard, GlassButton, Header, SkeletonList, ErrorState, EmptyState } from '@components';
 import { VoucherCatalogItem, UserVoucher } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
-import { formatCurrency, formatDate } from '@lib/formatters';
+import { formatCurrency, formatDate, formatHkc } from '@lib/formatters';
 
 type Tab = 'available' | 'mine';
 
@@ -18,9 +18,9 @@ const statusColorKey: Record<UserVoucher['status'], 'success' | 'warning' | 'err
 };
 
 // Reward Vouchers (Phase 4 continuation). "Available" is the shared catalog
-// (claimed by spending HK Points where the voucher has a cost); "My
+// (claimed by spending HK Coins where the voucher has a cost); "My
 // Vouchers" are the instances issued to this user. Redeeming a
-// `wallet_credit` voucher immediately credits the wallet - see
+// `wallet_credit` voucher credits the HKC wallet - see
 // functions/src/services/rewardsService.ts for why other usage types
 // aren't supported yet.
 export default function VouchersScreen() {
@@ -28,7 +28,7 @@ export default function VouchersScreen() {
   const [tab, setTab] = useState<Tab>('available');
   const [catalog, setCatalog] = useState<VoucherCatalogItem[]>([]);
   const [myVouchers, setMyVouchers] = useState<UserVoucher[]>([]);
-  const [pointsBalance, setPointsBalance] = useState(0);
+  const [hkcBalance, setHkcBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -37,14 +37,14 @@ export default function VouchersScreen() {
     try {
       setLoading(true);
       setError('');
-      const [c, mine, points] = await Promise.all([
+      const [c, mine, hkc] = await Promise.all([
         repositories.rewards.getVoucherCatalog(),
         repositories.rewards.getMyVouchers(),
-        repositories.rewards.getPointsBalance(),
+        repositories.rewards.getHkcBalance(),
       ]);
       setCatalog(c);
       setMyVouchers(mine);
-      setPointsBalance(points.balance);
+      setHkcBalance(hkc.balance);
     } catch (err: any) {
       setError(err.message || 'Failed to load vouchers');
     } finally {
@@ -72,7 +72,7 @@ export default function VouchersScreen() {
     setBusyId(voucher.id);
     try {
       await repositories.rewards.redeemVoucher(voucher.id);
-      Alert.alert('Voucher Redeemed', `${formatCurrency(voucher.value)} has been credited to your wallet.`);
+      Alert.alert('Voucher Redeemed', `${formatCurrency(voucher.value)} has been credited to your HK Coins balance.`);
       await load();
     } catch (err: any) {
       Alert.alert('Could not redeem voucher', err.message || 'Please try again.');
@@ -107,7 +107,7 @@ export default function VouchersScreen() {
 
         {tab === 'available' && (
           <>
-            <Text style={[styles.pointsHint, { color: colors.secondaryText }]}>HK Points balance: {pointsBalance.toLocaleString()} pts</Text>
+            <Text style={[styles.pointsHint, { color: colors.secondaryText }]}>HK Coins balance: {formatHkc(hkcBalance)}</Text>
             {catalog.length === 0 ? (
               <EmptyState icon="pricetag-outline" title="No vouchers available" description="Check back later for new vouchers" />
             ) : (
@@ -130,10 +130,10 @@ export default function VouchersScreen() {
                     <Text style={[styles.restrictions, { color: colors.mutedText }]}>{v.usageRestrictions}</Text>
                   ) : null}
                   <GlassButton
-                    title={v.pointsCost > 0 ? `Claim for ${v.pointsCost.toLocaleString()} pts` : 'Claim Free'}
+                    title={v.hkcCost > 0 ? `Claim for ${formatHkc(v.hkcCost)}` : 'Claim Free'}
                     onPress={() => handleClaim(v)}
                     loading={busyId === v.id}
-                    disabled={v.pointsCost > pointsBalance}
+                    disabled={v.hkcCost > hkcBalance}
                     style={styles.button}
                   />
                 </GlassCard>

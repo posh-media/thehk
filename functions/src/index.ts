@@ -7,7 +7,7 @@ import { listNetworkOperators, detectNetworkOperator, listDataPlans, placeAirtim
 import { listBillCategories, listBillers, verifyBillCustomer, payBill } from './services/billService';
 import { listGiftCardProducts, getGiftCardProduct, placeGiftCardOrder, getGiftCardRedeemCodes } from './services/giftCardService';
 import { assignReferralCode, applyReferralCode, getReferralSummary } from './services/referralService';
-import { ensurePoints, convertWalletToPoints, convertReferralBalanceToPoints, getPointsTransactionHistory, awardSignupBonus } from './services/pointsService';
+import { ensureHkcBalance, convertWalletToHkc as convertWalletToHkcImpl, convertReferralBalanceToHkc, getHkcTransactionHistory, awardSignupBonus } from './services/pointsService';
 import { getPlatformConfig } from './services/adminPanelService';
 import { ensureCashbackBalance, getCashbackHistory } from './services/cashbackService';
 import { listVoucherCatalog, listUserVouchers, claimVoucher, redeemVoucher } from './services/rewardsService';
@@ -97,6 +97,9 @@ export const onUserCreated = functions
       availableBalance: 0,
       pendingBalance: 0,
       currency: 'NGN',
+      hkcBalance: 0,
+      availableHkcBalance: 0,
+      pendingHkcBalance: 0,
       updatedAt: now,
     });
 
@@ -136,51 +139,51 @@ export const getReferralInfo = functions
     return { referralCode, ...summary };
   });
 
-export const convertReferralToPoints = functions
+export const convertReferralToHkc = functions
   .region(REGION)
   .runWith(RUNTIME_OPTS)
   .https.onCall(async (data, context) => {
     const uid = requireAuth(context);
     if (!data?.amount) throw new functions.https.HttpsError('invalid-argument', 'amount is required.');
     try {
-      const result = await convertReferralBalanceToPoints({ userId: uid, amountNaira: Number(data.amount) });
+      const result = await convertReferralBalanceToHkc({ userId: uid, amountNaira: Number(data.amount) });
       return { transaction: result };
     } catch (err) {
       throw new functions.https.HttpsError('failed-precondition', (err as Error).message);
     }
   });
 
-// --- Phase 4: HK Points ---
+// --- Phase 5: HK Coins ---
 
-export const getPoints = functions
+export const getHkc = functions
   .region(REGION)
   .runWith(RUNTIME_OPTS)
   .https.onCall(async (_data, context) => {
     const uid = requireAuth(context);
-    const points = await ensurePoints(uid);
-    return points;
+    const balance = await ensureHkcBalance(uid);
+    return balance;
   });
 
-export const convertWalletToHkPoints = functions
+export const convertWalletToHkc = functions
   .region(REGION)
   .runWith(RUNTIME_OPTS)
   .https.onCall(async (data, context) => {
     const uid = requireAuth(context);
     if (!data?.amount) throw new functions.https.HttpsError('invalid-argument', 'amount is required.');
     try {
-      const result = await convertWalletToPoints({ userId: uid, amountNaira: Number(data.amount) });
+      const result = await convertWalletToHkcImpl({ userId: uid, amountNaira: Number(data.amount) });
       return { transaction: result };
     } catch (err) {
       throw new functions.https.HttpsError('failed-precondition', (err as Error).message);
     }
   });
 
-export const getPointsHistory = functions
+export const getHkcHistory = functions
   .region(REGION)
   .runWith(RUNTIME_OPTS)
   .https.onCall(async (data, context) => {
     const uid = requireAuth(context);
-    const history = await getPointsTransactionHistory(uid, Math.min(Number(data?.limit) || 50, 100));
+    const history = await getHkcTransactionHistory(uid, Math.min(Number(data?.limit) || 50, 100));
     return { history };
   });
 
@@ -856,7 +859,7 @@ export const purchaseBankGenReceiptFn = functions
   .runWith(RUNTIME_OPTS)
   .https.onCall(async (data, context) => {
     const uid = requireAuth(context);
-    const { amount, senderName, senderAccountNumber, receiverBankName, receiverAccountNumber, receiverAccountName, usePoints, useCashback } = data || {};
+    const { amount, senderName, senderAccountNumber, receiverBankName, receiverAccountNumber, receiverAccountName, useCashback } = data || {};
     if (!amount || !senderName || !receiverBankName || !receiverAccountNumber || !receiverAccountName) {
       throw new functions.https.HttpsError('invalid-argument', 'amount, senderName, receiverBankName, receiverAccountNumber and receiverAccountName are required.');
     }
@@ -869,7 +872,6 @@ export const purchaseBankGenReceiptFn = functions
         receiverBankName: String(receiverBankName),
         receiverAccountNumber: String(receiverAccountNumber),
         receiverAccountName: String(receiverAccountName),
-        usePoints: Boolean(usePoints),
         useCashback: Boolean(useCashback),
       });
       return { receipt };

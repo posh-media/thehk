@@ -13,7 +13,7 @@ import {
   Notification,
   Referral,
   Reward,
-  HKPointTransaction,
+  HkcTransaction,
   SupportTicket,
   Tutorial,
   Bank,
@@ -49,6 +49,9 @@ export const mockWallet: Wallet = {
   availableBalance: 7500000,
   pendingBalance: 0,
   currency: 'NGN',
+  hkcBalance: 5000,
+  availableHkcBalance: 5000,
+  pendingHkcBalance: 0,
   updatedAt: '2024-08-18T09:00:00Z',
 };
 
@@ -286,15 +289,15 @@ export const mockReferrals: Referral[] = [
 ];
 
 export const mockRewards: Reward[] = [
-  { id: 'rwd-001', title: '₦500 Airtime Voucher', description: 'Use towards any airtime purchase', pointsCost: 500, type: 'voucher', isAvailable: true },
-  { id: 'rwd-002', title: '5% Marketplace Discount', description: 'Discount on next marketplace order', pointsCost: 1000, type: 'discount', isAvailable: true, expiresAt: '2024-09-30T23:59:59Z' },
-  { id: 'rwd-003', title: '7-Day Streak Bonus', description: 'Complete daily tasks for 7 days', pointsCost: 300, type: 'streak', isAvailable: true },
-  { id: 'rwd-004', title: '₦1,000 Cashback', description: 'Cashback to wallet', pointsCost: 2000, type: 'cashback', isAvailable: true },
+  { id: 'rwd-001', title: '₦500 Airtime Voucher', description: 'Use towards any airtime purchase', hkcCost: 500, type: 'voucher', isAvailable: true },
+  { id: 'rwd-002', title: '5% Marketplace Discount', description: 'Discount on next marketplace order', hkcCost: 1000, type: 'discount', isAvailable: true, expiresAt: '2024-09-30T23:59:59Z' },
+  { id: 'rwd-003', title: '7-Day Streak Bonus', description: 'Complete daily tasks for 7 days', hkcCost: 300, type: 'streak', isAvailable: true },
+  { id: 'rwd-004', title: '₦1,000 Cashback', description: 'Cashback to wallet', hkcCost: 2000, type: 'cashback', isAvailable: true },
 ];
 
-export const mockPointsTransactions: HKPointTransaction[] = [
-  { id: 'pt-001', userId: mockUser.id, type: 'wallet_conversion', points: 250, amount: 25000, status: 'successful', reference: 'HK-PTS-001', description: 'Converted from wallet', createdAt: '2024-08-14T18:30:00Z' },
-  { id: 'pt-002', userId: mockUser.id, type: 'referral_conversion', points: 200, amount: 20000, status: 'successful', reference: 'HK-PTS-002', description: 'Converted from referral balance', createdAt: '2024-08-10T12:00:00Z' },
+export const mockHkcTransactions: HkcTransaction[] = [
+  { id: 'hkc-001', userId: mockUser.id, type: 'conversion', amount: 250, ngnAmount: 25000, balanceAfter: 5000, reference: 'HKC-CONV-001', description: 'Converted from wallet', createdAt: '2024-08-14T18:30:00Z' },
+  { id: 'hkc-002', userId: mockUser.id, type: 'conversion', amount: 200, ngnAmount: 20000, balanceAfter: 4750, reference: 'HKC-REF-001', description: 'Converted from referral balance', createdAt: '2024-08-10T12:00:00Z' },
 ];
 
 export const mockSupportTickets: SupportTicket[] = [
@@ -314,17 +317,22 @@ export const mockBanks: Bank[] = [
     id: 'bank-opay',
     name: 'OPay',
     code: 'OPAY',
+    category: 'bank',
     logoAsset: require('../../../assets/images/bank-logos/opay.jpg'),
     implemented: true,
     receiptTemplate: 'opay',
   },
-  { id: 'bank-001', name: 'Kuda Bank', code: '50211', logoAsset: require('../../../assets/images/bank-logos/kuda.png'), implemented: false, receiptTemplate: 'generic' },
-  { id: 'bank-005', name: 'United Bank for Africa', code: '033', logoAsset: require('../../../assets/images/bank-logos/uba.webp'), implemented: false, receiptTemplate: 'generic' },
-  { id: 'bank-002', name: 'Access Bank', code: '044', logoUrl: 'https://logo.clearbit.com/accessbankplc.com', implemented: false, receiptTemplate: 'generic' },
-  { id: 'bank-003', name: 'Guaranty Trust Bank', code: '058', logoUrl: 'https://logo.clearbit.com/gtbank.com', implemented: false, receiptTemplate: 'generic' },
-  { id: 'bank-004', name: 'First Bank of Nigeria', code: '011', logoUrl: 'https://logo.clearbit.com/firstbanknigeria.com', implemented: false, receiptTemplate: 'generic' },
-  { id: 'bank-006', name: 'Zenith Bank', code: '057', logoUrl: 'https://logo.clearbit.com/zenithbank.com', implemented: false, receiptTemplate: 'generic' },
-  { id: 'bank-007', name: 'Fidelity Bank', code: '070', logoUrl: 'https://logo.clearbit.com/fidelitybank.ng', implemented: false, receiptTemplate: 'generic' },
-  { id: 'bank-008', name: 'Union Bank', code: '032', logoUrl: 'https://logo.clearbit.com/unionbankng.com', implemented: false, receiptTemplate: 'generic' },
-  { id: 'bank-palmpay', name: 'PalmPay', code: 'PALMPAY', logoAsset: require('../../../assets/images/bank-logos/palmpay.png'), implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-001', name: 'Kuda Bank', code: '50211', category: 'bank', logoAsset: require('../../../assets/images/bank-logos/kuda.png'), implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-005', name: 'United Bank for Africa', code: '033', category: 'bank', logoAsset: require('../../../assets/images/bank-logos/uba.webp'), implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-002', name: 'Access Bank', code: '044', category: 'bank', logoAsset: require('../../../assets/images/bank-logos/access-bank.png'), implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-003', name: 'Guaranty Trust Bank', code: '058', category: 'bank', logoAsset: require('../../../assets/images/bank-logos/gtbank.webp'), implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-004', name: 'First Bank of Nigeria', code: '011', category: 'bank', logoAsset: require('../../../assets/images/bank-logos/first-bank.png'), implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-006', name: 'Zenith Bank', code: '057', category: 'bank', logoAsset: require('../../../assets/images/bank-logos/zenith-bank.png'), implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-007', name: 'Fidelity Bank', code: '070', category: 'bank', logoAsset: require('../../../assets/images/bank-logos/fidelity-bank.png'), implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-008', name: 'Union Bank', code: '032', category: 'bank', logoAsset: require('../../../assets/images/bank-logos/union-bank.png'), implemented: false, receiptTemplate: 'generic' },
+  { id: 'bank-palmpay', name: 'PalmPay', code: 'PALMPAY', category: 'bank', logoAsset: require('../../../assets/images/bank-logos/palmpay.png'), implemented: false, receiptTemplate: 'generic' },
+  // Bank Gen "Wallets" section (non-bank transfer sources).
+  { id: 'wallet-coinbase', name: 'Coinbase', code: 'COINBASE', category: 'wallet', logoAsset: require('../../../assets/images/bank-logos/coinbase.webp'), implemented: false, receiptTemplate: 'generic' },
+  { id: 'wallet-paypal', name: 'PayPal', code: 'PAYPAL', category: 'wallet', logoAsset: require('../../../assets/images/bank-logos/paypal.png'), implemented: false, receiptTemplate: 'generic' },
+  { id: 'wallet-binance', name: 'Binance', code: 'BINANCE', category: 'wallet', logoAsset: require('../../../assets/images/bank-logos/binance.jpg'), implemented: false, receiptTemplate: 'generic' },
 ];

@@ -1,9 +1,8 @@
 import { db } from '../admin';
-import { refundWalletDebit } from './walletService';
-import { awardCashback } from './cashbackService';
+import { refundServiceOrder } from './orderService';
 import { verifyVtungPayload } from '../providers/vtungClient';
 import { RemoteTopupResult } from '../providers/utilityProvider';
-import { ServiceOrderRecord, ServiceOrderStatus, Transaction } from '../types';
+import { ServiceOrderRecord, ServiceOrderStatus } from '../types';
 
 function mapVtungStatus(status: string): 'successful' | 'processing' | 'failed' {
   const s = (status || '').toLowerCase();
@@ -52,26 +51,10 @@ export async function reconcileVtungOrder(requestId: string, result: RemoteTopup
   }
 
   if (status === 'failed') {
-    const txSnap = await db.collection('transactions').doc(order.transactionId).get();
-    const tx = txSnap.exists ? (txSnap.data() as Transaction) : null;
-    const walletDebit = tx ? tx.amount : order.amount;
-    const cashbackUsed = (tx?.metadata?.cashbackUsed as number) || 0;
-
-    await refundWalletDebit({
-      userId: order.userId,
-      transactionId: order.transactionId,
-      amount: walletDebit,
-      reason: `VTU.ng order ${result.providerTransactionId} ${getOrderStatus(result.status)}`,
-    });
-
-    if (cashbackUsed > 0) {
-      await awardCashback({
-        userId: order.userId,
-        amountKobo: cashbackUsed,
-        description: `Refund: VTU.ng order ${result.providerTransactionId} ${getOrderStatus(result.status)}`,
-        relatedOrderId: order.id,
-      });
-    }
+    await refundServiceOrder(
+      order,
+      `VTU.ng order ${result.providerTransactionId} ${getOrderStatus(result.status)}`
+    );
 
     await ref.update({
       status: getOrderStatus(result.status),

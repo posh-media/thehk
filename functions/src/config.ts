@@ -44,13 +44,15 @@ export const CURRENCY = {
 
 export const MIN_FUNDING_AMOUNT = 500; // NGN
 
-// HK Points: single authoritative conversion rate. Points are always
-// computed from a naira amount as `amountNaira * HK_POINTS_PER_NAIRA`.
+// HK Coins: single authoritative conversion rate. HKC is always computed from
+// a naira amount as `amountNaira * HKC_PER_NAIRA`.
 // Kept as one constant (rather than hardcoded across screens/functions) so
 // changing it later - or eventually loading it from an admin-configurable
 // Firestore doc - only requires touching this one value.
-export const HK_POINTS_PER_NAIRA = 1; // 1 NGN = 1 HK Point
-export const MIN_POINTS_CONVERSION_NAIRA = 100; // ₦100 minimum per conversion
+export const HKC_PER_NAIRA = 1; // 1 NGN = 1 HK Coin
+export const MIN_HKC_CONVERSION_NAIRA = 100; // ₦100 minimum per conversion
+export const SIGNUP_BONUS_HKC = 500; // 500 HK Coins awarded on first login
+export const BANK_GEN_PRICE_NAIRA = 100; // ₦100 or 100 HKC per receipt
 
 // Referral: flat reward credited to the referrer's referral balance when
 // their referred user completes the activation event (see

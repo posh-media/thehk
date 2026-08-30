@@ -1,33 +1,7 @@
 import { db } from '../admin';
 import { VoucherCatalogItem, UserVoucher } from '../types';
-import { creditWalletManual } from './walletService';
+import { creditHkc, debitHkc } from './walletService';
 import { generateReference } from '../utils';
-
-// HK Points debit is implemented directly here (rather than importing
-// pointsService, which only exposes credit helpers today) to avoid a
-// circular dependency between rewardsService and pointsService. If a
-// future feature needs to spend points from more than one place, this
-// should be promoted into pointsService as a shared `debitPoints` helper.
-async function debitPoints(userId: string, points: number): Promise<void> {
-  const ref = db.collection('points').doc(userId);
-  await db.runTransaction(async (t) => {
-    const snap = await t.get(ref);
-    const current = snap.exists ? (snap.data() as { balance: number }).balance : 0;
-    if (current < points) throw new Error('Insufficient HK Points balance');
-    t.set(ref, { userId, balance: current - points, updatedAt: new Date().toISOString() }, { merge: true });
-  });
-  const pointsTxId = db.collection('pointsTransactions').doc().id;
-  await db.collection('pointsTransactions').doc(pointsTxId).set({
-    id: pointsTxId,
-    userId,
-    type: 'redeemed',
-    points: -points,
-    status: 'successful',
-    reference: generateReference('HK-PTS'),
-    description: 'Redeemed for a THE-HK voucher',
-    createdAt: new Date().toISOString(),
-  });
-}
 
 function voucherRef(id: string) {
   return db.collection('vouchers').doc(id);
@@ -46,22 +20,22 @@ const DEFAULT_VOUCHERS: Omit<VoucherCatalogItem, 'createdAt' | 'updatedAt'>[] = 
   {
     id: 'voucher-welcome-500',
     title: '₦500 Welcome Voucher',
-    description: 'A welcome bonus credited straight to your wallet.',
+    description: 'A welcome bonus credited straight to your HKC wallet.',
     usageType: 'wallet_credit',
     value: 50000,
-    pointsCost: 0,
+    hkcCost: 0,
     usageRestrictions: 'One per account.',
     validForDays: 30,
     isActive: true,
   },
   {
-    id: 'voucher-1000-for-2000pts',
+    id: 'voucher-1000-for-2000hkc',
     title: '₦1,000 Wallet Voucher',
-    description: 'Redeem 2,000 HK Points for ₦1,000 credited to your wallet.',
+    description: 'Redeem 2,000 HK Coins for ₦1,000 credited to your HKC wallet.',
     usageType: 'wallet_credit',
     value: 100000,
-    pointsCost: 2000,
-    usageRestrictions: 'Requires sufficient HK Points balance.',
+    hkcCost: 2000,
+    usageRestrictions: 'Requires sufficient HK Coins balance.',
     validForDays: 60,
     isActive: true,
   },
@@ -87,8 +61,6 @@ export async function listUserVouchers(userId: string): Promise<UserVoucher[]> {
   const now = Date.now();
   const vouchers = snap.docs.map((d) => d.data() as UserVoucher);
 
-  // Lazily expire vouchers whose expiry date has passed - avoids needing a
-  // scheduled function for what is, for now, a low-volume feature.
   const updates = vouchers
     .filter((v) => v.status === 'issued' && v.expiresAt && new Date(v.expiresAt).getTime() < now)
     .map((v) => userVoucherRef(v.id).update({ status: 'expired' }).then(() => { v.status = 'expired'; }));
@@ -98,11 +70,8 @@ export async function listUserVouchers(userId: string): Promise<UserVoucher[]> {
 }
 
 /**
- * Claims a catalog voucher for a user, spending HK Points if the voucher
- * has a cost. Creates an issued `userVouchers` record. THE-HK doesn't have
- * an admin app yet to issue vouchers directly to specific users, so
- * "claiming" from the shared catalog is the mechanism for now - a future
- * admin-issued voucher would simply write directly to `userVouchers`.
+ * Claims a catalog voucher for a user, spending HK Coins if the voucher
+ * has a cost. Creates an issued `userVouchers` record.
  */
 export async function claimVoucher(userId: string, voucherId: string): Promise<UserVoucher> {
   const snap = await voucherRef(voucherId).get();
@@ -110,8 +79,15 @@ export async function claimVoucher(userId: string, voucherId: string): Promise<U
   const voucher = snap.data() as VoucherCatalogItem;
   if (!voucher.isActive) throw new Error('This voucher is no longer available');
 
-  if (voucher.pointsCost > 0) {
-    await debitPoints(userId, voucher.pointsCost);
+  if (voucher.hkcCost > 0) {
+    await debitHkc({
+      userId,
+      amount: voucher.hkcCost,
+      type: 'spending',
+      description: `Claimed voucher: ${voucher.title}`,
+      reference: generateReference('HKC-VOUCHER'),
+      metadata: { voucherId: voucher.id },
+    });
   }
 
   const now = new Date().toISOString();
@@ -139,8 +115,7 @@ export async function claimVoucher(userId: string, voucherId: string): Promise<U
 
 /**
  * Redeems (uses) an issued voucher. Only `wallet_credit` is supported
- * today - see the `VoucherUsageType` comment in functions/src/types.ts for
- * why other usage types are deferred rather than half-built.
+ * today. The voucher value (kobo) is converted 1:1 to HK Coins.
  */
 export async function redeemVoucher(userId: string, userVoucherId: string): Promise<UserVoucher> {
   const snap = await userVoucherRef(userVoucherId).get();
@@ -154,15 +129,18 @@ export async function redeemVoucher(userId: string, userVoucherId: string): Prom
   if (voucher.status !== 'issued') throw new Error(`This voucher is already ${voucher.status}`);
 
   if (voucher.usageType === 'wallet_credit') {
-    const { transaction } = await creditWalletManual({
+    const hkcAmount = Math.round(voucher.value / 100);
+    const tx = await creditHkc({
       userId,
-      amount: voucher.value,
-      type: 'voucher_redemption',
+      amount: hkcAmount,
+      type: 'deposit',
       description: `Voucher redeemed: ${voucher.title}`,
+      reference: generateReference('HKC-REDEEM'),
+      metadata: { userVoucherId, voucherId: voucher.voucherId, voucherValueKobo: voucher.value },
     });
     const now = new Date().toISOString();
-    await userVoucherRef(userVoucherId).update({ status: 'redeemed', redeemedAt: now, transactionId: transaction.id });
-    return { ...voucher, status: 'redeemed', redeemedAt: now, transactionId: transaction.id };
+    await userVoucherRef(userVoucherId).update({ status: 'redeemed', redeemedAt: now, transactionId: tx.id });
+    return { ...voucher, status: 'redeemed', redeemedAt: now, transactionId: tx.id };
   }
 
   throw new Error(`Voucher usage type "${voucher.usageType}" is not supported yet`);

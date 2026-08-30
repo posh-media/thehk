@@ -36,11 +36,23 @@ export interface User {
 
 export interface Wallet {
   userId: string;
+  // NGN wallet (secondary - seller/withdrawal balance). Stored in kobo.
   balance: number; // kobo
   availableBalance: number; // kobo
   pendingBalance: number; // kobo
   currency: Currency;
   firstFundedAt?: string; // set once, on the first successful wallet funding - used to gate referral activation
+  // HK Coins (primary consumer spending balance). Stored in whole HKC: 1 HKC = ₦1.
+  hkcBalance: number;
+  availableHkcBalance: number;
+  pendingHkcBalance: number;
+  updatedAt: string;
+}
+
+// Standalone HKC balance view (mirrors the wallet fields for HKC).
+export interface HkcBalance {
+  userId: string;
+  balance: number; // whole HKC
   updatedAt: string;
 }
 
@@ -119,25 +131,29 @@ export interface ServiceOrderRecord {
   updatedAt: string;
 }
 
-// --- Phase 4: HK Points ---
+// --- Phase 5: HK Coins (formerly HK Points) ---
+// 1 HKC = ₦1. HKC is the primary consumer spending balance. NGN wallet is secondary.
 
-export interface PointsBalance {
-  userId: string;
-  balance: number; // whole HK Points
-  updatedAt: string;
-}
+export type HkcTransactionType =
+  | 'signup_bonus'
+  | 'deposit'
+  | 'spending'
+  | 'conversion'
+  | 'refund'
+  | 'adjustment'
+  // Legacy migration type for points converted to HKC.
+  | 'migration';
 
-export type PointsTransactionType = 'wallet_conversion' | 'referral_conversion' | 'redeemed' | 'adjustment' | 'signup_bonus';
-
-export interface PointsTransaction {
+export interface HkcTransaction {
   id: string;
   userId: string;
-  type: PointsTransactionType;
-  points: number; // positive = credit, negative = debit
-  amount?: number; // kobo - the naira side of a conversion, where applicable
+  type: HkcTransactionType;
+  amount: number; // whole HKC, positive = credit, negative = debit
+  ngnAmount?: number; // kobo - the NGN side of a conversion, where applicable
+  balanceAfter: number; // whole HKC after this transaction
   description: string;
-  status: 'successful';
   reference: string;
+  metadata?: Record<string, unknown>;
   createdAt: string;
 }
 
@@ -171,7 +187,7 @@ export interface VoucherCatalogItem {
   description: string;
   usageType: VoucherUsageType;
   value: number; // kobo - credited to wallet when redeemed (for wallet_credit vouchers)
-  pointsCost: number; // HK Points required to claim; 0 = free
+  hkcCost: number; // HK Coins required to claim; 0 = free
   usageRestrictions?: string;
   validForDays?: number; // how long an issued voucher stays usable after being claimed
   isActive: boolean;

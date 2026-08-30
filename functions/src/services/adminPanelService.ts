@@ -9,7 +9,7 @@ const CONFIG_REF = db.collection('adminPanel').doc('platform');
 const DEFAULT_CONFIG: AdminPlatformConfig = {
   onMaintenance: false,
   supportEmail: 'support@the-hk.com',
-  announcements: ['Welcome to THE-HK', 'HK Points and Referrals are now live - start earning today.'],
+  announcements: ['Welcome to THE-HK', 'HK Coins and Referrals are now live - start earning today.'],
   tutorials: [
     {
       id: 'tut-fund-wallet',
@@ -21,7 +21,7 @@ const DEFAULT_CONFIG: AdminPlatformConfig = {
     },
   ],
   tips: [
-    'Convert idle wallet balance to HK Points to unlock voucher rewards.',
+    'Convert idle NGN wallet balance to HK Coins to unlock voucher rewards.',
     'Share your referral link - you earn a reward once your friend funds their wallet for the first time.',
     'Always double-check the recipient details before confirming a payment.',
   ],

@@ -8,7 +8,7 @@ import { spacing, typography, borderRadius } from '@theme/tokens';
 import { GlassCard, SectionHeader, LoadingState, ErrorState, EmptyState } from '@components';
 import { ReferralSummary, Reward } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
-import { formatCurrency } from '@lib/formatters';
+import { formatCurrency, formatHkc } from '@lib/formatters';
 import { useAuthStore } from '@stores/authStore';
 
 export default function RewardsScreen() {
@@ -107,7 +107,7 @@ export default function RewardsScreen() {
           </TouchableOpacity>
           <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/rewards/points')} style={[styles.quickLink, { backgroundColor: colors.surface }]}>
             <Ionicons name="star-outline" size={20} color={colors.primary} />
-            <Text style={[styles.quickLinkText, { color: colors.primaryText }]}>HK Points</Text>
+            <Text style={[styles.quickLinkText, { color: colors.primaryText }]}>HK Coins</Text>
           </TouchableOpacity>
           <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/rewards/cashback')} style={[styles.quickLink, { backgroundColor: colors.surface }]}>
             <Ionicons name="cash-outline" size={20} color={colors.primary} />
@@ -129,7 +129,7 @@ export default function RewardsScreen() {
                   <Text style={[styles.name, { color: colors.primaryText }]}>{r.title}</Text>
                   <Text style={[styles.status, { color: colors.secondaryText }]}>{r.description}</Text>
                 </View>
-                <Text style={[styles.points, { color: colors.primary }]}>{r.pointsCost} pts</Text>
+                <Text style={[styles.points, { color: colors.primary }]}>{formatHkc(r.hkcCost)}</Text>
               </View>
             </GlassCard>
           ))

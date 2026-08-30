@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography } from '@theme/tokens';
 import { GlassCard, SectionHeader, ServiceCard, TransactionCard, EmptyState, ErrorState, AnnouncementMarquee, SkeletonCard, SkeletonList, SkeletonText, SkeletonTitle, SkeletonCircle } from '@components';
 import { useResponsive } from '@hooks/useResponsive';
 import { useAuthStore } from '@stores/authStore';
 import { repositories } from '@repositories/mockRepository';
+import { db } from '@infrastructure/firebase';
 import { Wallet, Transaction, Service } from '@/types/domain';
-import { formatCurrency } from '@lib/formatters';
+import { formatCurrency, formatHkc } from '@lib/formatters';
 import { openService } from '@lib/serviceNavigation';
 
 export default function HomeScreen() {
@@ -27,19 +29,22 @@ export default function HomeScreen() {
   const [servicesLoading, setServicesLoading] = useState(true);
   const [announcements, setAnnouncements] = useState<string[]>([]);
 
+  const refreshWallet = useCallback(async () => {
+    if (!user?.id) return;
+    setWalletLoading(true);
+    setWalletError('');
+    try {
+      const w = await repositories.wallet.getWallet(user.id);
+      setWallet(w);
+    } catch (err: any) {
+      setWalletError(err.message || 'Failed to load wallet');
+    } finally {
+      setWalletLoading(false);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     let cancelled = false;
-
-    async function loadWallet() {
-      try {
-        const w = await repositories.wallet.getWallet(user?.id || '');
-        if (!cancelled) setWallet(w);
-      } catch (err: any) {
-        if (!cancelled) setWalletError(err.message || 'Failed to load wallet');
-      } finally {
-        if (!cancelled) setWalletLoading(false);
-      }
-    }
 
     async function loadTransactions() {
       try {
@@ -63,17 +68,31 @@ export default function HomeScreen() {
       }
     }
 
-    loadWallet();
+    refreshWallet();
     loadTransactions();
     loadServices();
 
-    // Announcements are non-critical, best-effort content - a failure here
-    // should never block the rest of the dashboard from loading.
     repositories.admin.getPlatformConfig()
       .then((config) => { if (!cancelled) setAnnouncements(config.announcements); })
       .catch(() => { if (!cancelled) setAnnouncements([]); });
 
     return () => { cancelled = true; };
+  }, [user?.id, refreshWallet]);
+
+  // Real-time wallet listener so the dashboard balance reflects new
+  // deposits/purchases without manual pull-to-refresh.
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    return onSnapshot(doc(db, 'wallets', user.id), (snap) => {
+      if (snap.exists()) {
+        setWallet(snap.data() as Wallet);
+        setWalletLoading(false);
+        setWalletError('');
+      }
+    }, (err) => {
+      setWalletError(err.message || 'Failed to load wallet');
+      setWalletLoading(false);
+    });
   }, [user?.id]);
 
   return (
@@ -109,14 +128,25 @@ export default function HomeScreen() {
           ) : (
             <>
               <View style={styles.balanceHeader}>
-                <Text style={[styles.balanceLabel, { color: colors.secondaryText }]}>Wallet Balance</Text>
-                <TouchableOpacity onPress={() => setHideBalance(!hideBalance)}>
-                  <Ionicons name={hideBalance ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.secondaryText} />
-                </TouchableOpacity>
+                <Text style={[styles.balanceLabel, { color: colors.secondaryText }]}>HK Coins Balance</Text>
+                <View style={styles.balanceActions}>
+                  <TouchableOpacity onPress={refreshWallet} style={styles.refreshButton}>
+                    <Ionicons name="refresh-outline" size={20} color={colors.secondaryText} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setHideBalance(!hideBalance)}>
+                    <Ionicons name={hideBalance ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.secondaryText} />
+                  </TouchableOpacity>
+                </View>
               </View>
               <Text style={[styles.balance, { color: colors.primaryText }]}>
-                {hideBalance ? '****' : formatCurrency(wallet?.balance || 0)}
+                {hideBalance ? '****' : formatHkc(wallet?.hkcBalance || 0)}
               </Text>
+              <View style={[styles.ngnRow, { borderTopColor: colors.divider }]}>
+                <Text style={[styles.ngnLabel, { color: colors.secondaryText }]}>NGN Wallet</Text>
+                <Text style={[styles.ngnValue, { color: colors.primaryText }]}>
+                  {hideBalance ? '****' : formatCurrency(wallet?.balance || 0)}
+                </Text>
+              </View>
               <View style={styles.actions}>
                 <TouchableOpacity style={styles.action} onPress={() => router.push('/wallet/fund')}>
                   <View style={[styles.actionIcon, { backgroundColor: colors.primary }]}>
@@ -233,7 +263,30 @@ const styles = StyleSheet.create({
   balance: {
     fontSize: 36,
     fontWeight: typography.weights.bold as any,
+    marginBottom: spacing.md,
+  },
+  balanceActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  refreshButton: {
+    padding: spacing.xs,
+  },
+  ngnRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    paddingTop: spacing.md,
     marginBottom: spacing.xl,
+  },
+  ngnLabel: {
+    fontSize: typography.sizes.sm,
+  },
+  ngnValue: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold as any,
   },
   actions: {
     flexDirection: 'row',

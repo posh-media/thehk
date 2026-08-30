@@ -5,42 +5,47 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
 import { GlassCard, GlassInput, GlassButton, Header, SkeletonList, ErrorState, EmptyState } from '@components';
-import { Wallet, HKPointTransaction, PointsBalance, ReferralSummary } from '@/types/domain';
+import { Wallet, HkcTransaction, HkcBalance, ReferralSummary } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 import { useAuthStore } from '@stores/authStore';
-import { formatCurrency, formatDate } from '@lib/formatters';
+import { formatCurrency, formatHkc, formatDate } from '@lib/formatters';
 
-// HK Points direction (Phase 4): Wallet/Referral Balance -> HK Points, at a
-// single authoritative rate (1 NGN = 1 HK Point), enforced server-side in
-// functions/src/services/pointsService.ts. The rate shown here is display
-// only - the server never trusts a client-submitted rate or point total.
-const HK_POINTS_RATE_LABEL = '1 NGN = 1 HK Point';
+// HK Coins conversion (Phase 5): Wallet/Referral Balance -> HK Coins, at a
+// single authoritative rate (1 NGN = 1 HKC), enforced server-side in
+// functions/src/services/pointsService.ts. The rate shown here is display only.
+const HKC_RATE_LABEL = '1 NGN = 1 HK Coin';
 const MIN_CONVERSION_NAIRA = 100;
 const quickAmounts = [100, 500, 1000, 5000];
 
 type Source = 'wallet' | 'referral';
 
-const typeLabel: Record<HKPointTransaction['type'], string> = {
-  wallet_conversion: 'Converted from Wallet',
-  referral_conversion: 'Converted from Referral Balance',
-  redeemed: 'Points Redeemed',
+const typeLabel: Record<HkcTransaction['type'], string> = {
+  conversion: 'Converted to HK Coins',
+  deposit: 'Deposit / Bonus',
+  spending: 'Spent',
+  refund: 'Refund',
+  signup_bonus: 'Signup Bonus',
+  migration: 'Migrated from HK Points',
   adjustment: 'Adjustment',
 };
 
-const typeIcon: Record<HKPointTransaction['type'], string> = {
-  wallet_conversion: 'wallet-outline',
-  referral_conversion: 'people-outline',
-  redeemed: 'remove-circle-outline',
-  adjustment: 'sync-outline',
+const typeIcon: Record<HkcTransaction['type'], string> = {
+  conversion: 'wallet-outline',
+  deposit: 'arrow-down-circle-outline',
+  spending: 'remove-circle-outline',
+  refund: 'refresh-circle-outline',
+  signup_bonus: 'gift-outline',
+  migration: 'sync-outline',
+  adjustment: 'options-outline',
 };
 
-export default function PointsScreen() {
+export default function CoinsScreen() {
   const { colors } = useTheme();
   const { user } = useAuthStore();
   const [wallet, setWallet] = useState<Wallet | null>(null);
-  const [points, setPoints] = useState<PointsBalance | null>(null);
+  const [hkc, setHkc] = useState<HkcBalance | null>(null);
   const [referralSummary, setReferralSummary] = useState<ReferralSummary | null>(null);
-  const [transactions, setTransactions] = useState<HKPointTransaction[]>([]);
+  const [transactions, setTransactions] = useState<HkcTransaction[]>([]);
   const [source, setSource] = useState<Source>('wallet');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(true);
@@ -51,18 +56,18 @@ export default function PointsScreen() {
     try {
       setLoading(true);
       setError('');
-      const [w, p, r, t] = await Promise.all([
+      const [w, h, r, t] = await Promise.all([
         repositories.wallet.getWallet(user?.id || ''),
-        repositories.rewards.getPointsBalance(),
+        repositories.rewards.getHkcBalance(),
         repositories.rewards.getReferralSummary(),
-        repositories.rewards.getPointsTransactions(user?.id || ''),
+        repositories.rewards.getHkcTransactions(user?.id || ''),
       ]);
       setWallet(w);
-      setPoints(p);
+      setHkc(h);
       setReferralSummary(r);
       setTransactions(t);
     } catch (err: any) {
-      setError(err.message || 'Failed to load points data');
+      setError(err.message || 'Failed to load HK Coins data');
     } finally {
       setLoading(false);
     }
@@ -73,7 +78,7 @@ export default function PointsScreen() {
   }, [load]);
 
   const numericAmount = parseFloat(amount.replace(/,/g, '')) || 0;
-  const pointsPreview = Math.round(numericAmount); // 1 NGN = 1 HK Point
+  const hkcPreview = Math.round(numericAmount); // 1 NGN = 1 HKC
   const sourceBalance = source === 'wallet' ? (wallet?.balance || 0) : (referralSummary?.balance || 0);
   const isValid = numericAmount >= MIN_CONVERSION_NAIRA && numericAmount * 100 <= sourceBalance;
 
@@ -84,19 +89,19 @@ export default function PointsScreen() {
     try {
       setConverting(true);
       const transaction = source === 'wallet'
-        ? await repositories.rewards.convertWalletToPoints(numericAmount)
-        : await repositories.rewards.convertReferralToPoints(numericAmount);
+        ? await repositories.rewards.convertWalletToHkc(numericAmount)
+        : await repositories.rewards.convertReferralToHkc(numericAmount);
       setTransactions((prev) => [transaction, ...prev]);
-      setPoints((prev) => (prev ? { ...prev, balance: prev.balance + transaction.points } : prev));
+      setHkc((prev) => (prev ? { ...prev, balance: prev.balance + transaction.amount } : prev));
       if (source === 'wallet') {
         setWallet((prev) => (prev ? { ...prev, balance: prev.balance - numericAmount * 100 } : prev));
       } else {
         setReferralSummary((prev) => (prev ? { ...prev, balance: prev.balance - numericAmount * 100 } : prev));
       }
       setAmount('');
-      Alert.alert('Conversion Successful', `${formatCurrency(numericAmount * 100)} converted to ${transaction.points.toLocaleString()} HK Points`);
+      Alert.alert('Conversion Successful', `${formatCurrency(numericAmount * 100)} converted to ${formatHkc(transaction.amount)}`);
     } catch (err: any) {
-      Alert.alert('Conversion Failed', err.message || 'Unable to convert to HK Points');
+      Alert.alert('Conversion Failed', err.message || 'Unable to convert to HK Coins');
     } finally {
       setConverting(false);
     }
@@ -105,7 +110,7 @@ export default function PointsScreen() {
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Header title="HK Points" />
+        <Header title="HK Coins" />
         <SkeletonList count={5} />
       </View>
     );
@@ -115,18 +120,18 @@ export default function PointsScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
       <View style={styles.inner}>
-        <Header title="HK Points" />
+        <Header title="HK Coins" />
 
         <GlassCard style={styles.balanceCard}>
-          <Text style={[styles.balanceLabel, { color: colors.secondaryText }]}>HK Points Balance</Text>
-          <Text style={[styles.balance, { color: colors.primaryText }]}>{(points?.balance || 0).toLocaleString()} pts</Text>
+          <Text style={[styles.balanceLabel, { color: colors.secondaryText }]}>HK Coins Balance</Text>
+          <Text style={[styles.balance, { color: colors.primaryText }]}>{formatHkc(hkc?.balance || 0)}</Text>
           <View style={[styles.rateBadge, { backgroundColor: colors.glassSurface, borderColor: colors.glassBorder }]}>
-            <Text style={[styles.rateText, { color: colors.primary }]}>{HK_POINTS_RATE_LABEL}</Text>
+            <Text style={[styles.rateText, { color: colors.primary }]}>{HKC_RATE_LABEL}</Text>
           </View>
         </GlassCard>
 
         <GlassCard style={styles.convertCard}>
-          <Text style={[styles.convertTitle, { color: colors.primaryText }]}>Convert to HK Points</Text>
+          <Text style={[styles.convertTitle, { color: colors.primaryText }]}>Convert to HK Coins</Text>
 
           <View style={styles.sourceToggle}>
             <TouchableOpacity
@@ -164,7 +169,7 @@ export default function PointsScreen() {
 
           <View style={[styles.preview, { backgroundColor: colors.glassSurface }]}>
             <Text style={[styles.previewLabel, { color: colors.secondaryText }]}>You receive</Text>
-            <Text style={[styles.previewValue, { color: colors.primary }]}>{pointsPreview.toLocaleString()} pts</Text>
+            <Text style={[styles.previewValue, { color: colors.primary }]}>{formatHkc(hkcPreview)}</Text>
           </View>
 
           <Text style={[styles.chipsLabel, { color: colors.secondaryText }]}>Quick Amounts</Text>
@@ -201,7 +206,7 @@ export default function PointsScreen() {
           </View>
 
           <GlassButton
-            title="Convert Points"
+            title="Convert to HKC"
             loading={converting}
             disabled={!isValid}
             onPress={handleConvert}
@@ -209,9 +214,9 @@ export default function PointsScreen() {
           />
         </GlassCard>
 
-        <Text style={[styles.historyTitle, { color: colors.primaryText }]}>Conversion History</Text>
+        <Text style={[styles.historyTitle, { color: colors.primaryText }]}>HKC History</Text>
         {transactions.length === 0 ? (
-          <EmptyState icon="sync-outline" title="No conversions yet" description="Convert wallet or referral balance to see history here" />
+          <EmptyState icon="sync-outline" title="No transactions yet" description="Convert wallet or referral balance to see HKC history here" />
         ) : (
           transactions.map((transaction) => (
             <GlassCard key={transaction.id} style={styles.historyCard} blur={false}>
@@ -224,11 +229,11 @@ export default function PointsScreen() {
                   <Text style={[styles.date, { color: colors.mutedText }]}>{formatDate(transaction.createdAt)}</Text>
                 </View>
                 <View style={styles.right}>
-                  <Text style={[styles.points, { color: transaction.points >= 0 ? colors.success : colors.error }]}>
-                    {transaction.points >= 0 ? '+' : ''}{transaction.points.toLocaleString()} pts
+                  <Text style={[styles.points, { color: transaction.amount >= 0 ? colors.success : colors.error }]}>
+                    {transaction.amount >= 0 ? '+' : ''}{formatHkc(transaction.amount)}
                   </Text>
-                  {transaction.amount !== undefined && (
-                    <Text style={[styles.cash, { color: colors.secondaryText }]}>{formatCurrency(transaction.amount)}</Text>
+                  {transaction.ngnAmount !== undefined && (
+                    <Text style={[styles.cash, { color: colors.secondaryText }]}>{formatCurrency(transaction.ngnAmount)}</Text>
                   )}
                 </View>
               </View>

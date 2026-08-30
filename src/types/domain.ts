@@ -14,7 +14,9 @@ export type TransactionType =
   | 'marketplace_purchase'
   | 'marketplace_refund'
   | 'referral_reward'
-  | 'points_conversion';
+  // Legacy points_conversion transactions are historical only; new conversions use hkc_conversion.
+  | 'points_conversion'
+  | 'hkc_conversion';
 
 export interface UserPreferences {
   emailNotification: boolean;
@@ -42,10 +44,22 @@ export interface User {
 
 export interface Wallet {
   userId: string;
+  // NGN wallet (secondary - seller/withdrawal balance). Stored in kobo.
   balance: number;
   availableBalance: number;
   pendingBalance: number;
   currency: Currency;
+  // HK Coins (primary consumer spending balance). Stored in whole HKC: 1 HKC = ₦1.
+  hkcBalance: number;
+  availableHkcBalance: number;
+  pendingHkcBalance: number;
+  updatedAt: string;
+}
+
+// Standalone HKC balance view (mirrors the wallet fields for HKC).
+export interface HkcBalance {
+  userId: string;
+  balance: number; // whole HKC
   updatedAt: string;
 }
 
@@ -120,6 +134,8 @@ export interface Bank {
   logoAsset?: number;
   implemented?: boolean;
   receiptTemplate?: string;
+  // 'bank' for traditional Nigerian banks, 'wallet' for Bank Gen wallets (Coinbase, PayPal, Binance, etc.).
+  category?: 'bank' | 'wallet';
 }
 
 export interface ServiceCategory {
@@ -318,29 +334,34 @@ export interface Reward {
   id: string;
   title: string;
   description: string;
-  pointsCost: number;
+  hkcCost: number;
   type: 'voucher' | 'streak' | 'cashback' | 'discount';
   isAvailable: boolean;
   expiresAt?: string;
 }
 
-export interface PointsBalance {
-  userId: string;
-  balance: number; // whole HK Points
-  updatedAt: string;
-}
+// HK Coins (HKC) transaction & balance types.
 
-export type HKPointTransactionType = 'wallet_conversion' | 'referral_conversion' | 'redeemed' | 'adjustment';
+export type HkcTransactionType =
+  | 'signup_bonus'
+  | 'deposit'
+  | 'spending'
+  | 'conversion'
+  | 'refund'
+  | 'adjustment'
+  // Legacy migration type for points converted to HKC.
+  | 'migration';
 
-export interface HKPointTransaction {
+export interface HkcTransaction {
   id: string;
   userId: string;
-  type: HKPointTransactionType;
-  points: number; // positive = credit, negative = debit
-  amount?: number; // kobo - the naira side of a conversion, where applicable
+  type: HkcTransactionType;
+  amount: number; // whole HK Coins, positive = credit, negative = debit
+  ngnAmount?: number; // kobo - the NGN side of a conversion, where applicable
+  balanceAfter: number; // whole HK Coins after this transaction
   description: string;
-  status: 'successful';
   reference: string;
+  metadata?: Record<string, unknown>;
   createdAt: string;
 }
 
@@ -378,7 +399,7 @@ export interface VoucherCatalogItem {
   description: string;
   usageType: VoucherUsageType;
   value: number; // kobo
-  pointsCost: number;
+  hkcCost: number;
   usageRestrictions?: string;
   validForDays?: number;
   isActive: boolean;

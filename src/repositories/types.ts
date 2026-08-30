@@ -15,8 +15,8 @@ import {
   Referral,
   ReferralSummary,
   Reward,
-  HKPointTransaction,
-  PointsBalance,
+  HkcTransaction,
+  HkcBalance,
   SupportTicket,
   Tutorial,
   Bank,
@@ -109,10 +109,10 @@ export interface RewardsRepository {
   getReferralSummary(): Promise<ReferralSummary>;
   applyReferralCode(code: string): Promise<void>;
   getRewards(userId: string): Promise<Reward[]>;
-  getPointsBalance(): Promise<PointsBalance>;
-  getPointsTransactions(userId: string): Promise<HKPointTransaction[]>;
-  convertWalletToPoints(amountNaira: number): Promise<HKPointTransaction>;
-  convertReferralToPoints(amountNaira: number): Promise<HKPointTransaction>;
+  getHkcBalance(): Promise<HkcBalance>;
+  getHkcTransactions(userId: string): Promise<HkcTransaction[]>;
+  convertWalletToHkc(amountNaira: number): Promise<HkcTransaction>;
+  convertReferralToHkc(amountNaira: number): Promise<HkcTransaction>;
   getVoucherCatalog(): Promise<VoucherCatalogItem[]>;
   getMyVouchers(): Promise<UserVoucher[]>;
   claimVoucher(voucherId: string): Promise<UserVoucher>;
@@ -158,7 +158,6 @@ export interface ReceiptRepository {
     receiverBankName: string;
     receiverAccountNumber: string;
     receiverAccountName: string;
-    usePoints?: boolean;
     useCashback?: boolean;
   }): Promise<ReceiptRecord>;
   getReceipt(receiptId: string): Promise<ReceiptRecord>;

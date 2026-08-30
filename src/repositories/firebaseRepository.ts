@@ -47,8 +47,8 @@ import {
   GiftCardProduct,
   ReferralSummary,
   Reward,
-  PointsBalance,
-  HKPointTransaction,
+  HkcBalance,
+  HkcTransaction,
   VoucherCatalogItem,
   UserVoucher,
   CashbackBalance,
@@ -64,13 +64,20 @@ import {
   mockNotifications,
 } from '@/data/mocks';
 import { toMinorUnits } from '@lib/formatters';
+import { mapCallableError } from '@lib/errors';
 
 // Cloud Functions region
 const REGION = 'us-central1';
 
 function getCallable<T = any, R = any>(name: string) {
   const fn = httpsCallable<T, R>(functions, name, { limitedUseAppCheckTokens: false });
-  return fn;
+  return async (data: T) => {
+    try {
+      return await fn(data);
+    } catch (err) {
+      throw mapCallableError(err);
+    }
+  };
 }
 
 // Merge the static service catalog with optional admin-panel overrides so
@@ -542,28 +549,28 @@ class FirebaseRewardsRepository implements RewardsRepository {
     await fn({ code });
   }
 
-  async getRewards(): Promise<Reward[]> { return (await import('@/data/mocks')).mockRewards; }
+  async getRewards(_userId?: string): Promise<Reward[]> { return (await import('@/data/mocks')).mockRewards; }
 
-  async getPointsBalance(): Promise<PointsBalance> {
-    const fn = getCallable<{}, PointsBalance>('getPoints');
+  async getHkcBalance(): Promise<HkcBalance> {
+    const fn = getCallable<{}, HkcBalance>('getHkc');
     const { data } = await fn({});
     return data;
   }
 
-  async getPointsTransactions(): Promise<HKPointTransaction[]> {
-    const fn = getCallable<{ limit?: number }, { history: HKPointTransaction[] }>('getPointsHistory');
+  async getHkcTransactions(_userId?: string): Promise<HkcTransaction[]> {
+    const fn = getCallable<{ limit?: number }, { history: HkcTransaction[] }>('getHkcHistory');
     const { data } = await fn({ limit: 50 });
     return data.history;
   }
 
-  async convertWalletToPoints(amountNaira: number): Promise<HKPointTransaction> {
-    const fn = getCallable<{ amount: number }, { transaction: HKPointTransaction }>('convertWalletToHkPoints');
+  async convertWalletToHkc(amountNaira: number): Promise<HkcTransaction> {
+    const fn = getCallable<{ amount: number }, { transaction: HkcTransaction }>('convertWalletToHkc');
     const { data } = await fn({ amount: amountNaira });
     return data.transaction;
   }
 
-  async convertReferralToPoints(amountNaira: number): Promise<HKPointTransaction> {
-    const fn = getCallable<{ amount: number }, { transaction: HKPointTransaction }>('convertReferralToPoints');
+  async convertReferralToHkc(amountNaira: number): Promise<HkcTransaction> {
+    const fn = getCallable<{ amount: number }, { transaction: HkcTransaction }>('convertReferralToHkc');
     const { data } = await fn({ amount: amountNaira });
     return data.transaction;
   }
@@ -672,10 +679,9 @@ class FirebaseReceiptRepository implements ReceiptRepository {
     receiverBankName: string;
     receiverAccountNumber: string;
     receiverAccountName: string;
-    usePoints?: boolean;
     useCashback?: boolean;
   }): Promise<ReceiptRecord> {
-    const fn = getCallable<typeof data, { receipt: ReceiptRecord }>('purchaseBankGenReceipt');
+    const fn = getCallable<typeof data, { receipt: ReceiptRecord }>('purchaseBankGenReceiptFn');
     const { data: result } = await fn(data);
     return result.receipt;
   }

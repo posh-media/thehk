@@ -1,6 +1,5 @@
 import { db } from '../admin';
-import { debitWalletForOrder, refundWalletDebit } from './walletService';
-import { spendCashback, awardCashback } from './cashbackService';
+import { debitConsumerPayment, refundConsumerPayment } from './walletService';
 import { generateReference } from '../utils';
 import { RemoteTopupResult } from '../providers/utilityProvider';
 import { ServiceOrderRecord, ServiceOrderType, Transaction } from '../types';
@@ -29,51 +28,35 @@ interface SubmitServiceOrderInput {
   amountKobo: number;
   metadata?: Record<string, unknown>;
   /**
-   * When true, applies THE-HK's cashback-first payment priority: eligible
-   * cashback balance is spent before the wallet is charged for the
-   * remainder. Not every service opts into this yet - see
-   * PHASE_4_CONTINUATION_REPORT.md for which one does today and why the
-   * others weren't changed in this pass.
+   * When true, eligible cashback is applied after the HKC primary balance and
+   * before the NGN wallet is charged for the remainder.
    */
   useCashback?: boolean;
   submit: () => Promise<RemoteTopupResult>;
 }
 
 /**
- * Shared debit -> create order -> call provider -> refund-on-failure flow
- * used by every Phase 3 service (social media, airtime, data, bills, gift
- * cards). Centralizing this means every service gets the same
- * server-authoritative wallet safety guarantees without re-implementing
- * them: the wallet is only ever debited once per order, and only refunded
- * if the provider call explicitly fails - a `processing` result (common for
- * utility bills and some gift card orders) is left alone rather than
- * guessed at, to avoid double-spend/refund races on genuinely asynchronous
- * providers.
+ * Shared debit -> create order -> call provider -> refund-on-failure flow used
+ * by every Phase 3/5 service. The wallet is only debited once per order using
+ * the canonical payment priority (HKC -> Cashback -> NGN wallet), and refunded
+ * only if the provider call explicitly fails. A `processing` result is left
+ * alone to avoid double-spend/refund races on genuinely asynchronous providers.
  */
 export async function submitServiceOrder(input: SubmitServiceOrderInput): Promise<ServiceOrderRecord> {
   const description = `${input.serviceName} - ${input.link}`;
-
-  // Cashback-first priority: spend eligible cashback before touching the
-  // wallet. `spendCashback` caps at whatever is actually available, so the
-  // wallet only ever covers the true remainder.
-  let cashbackUsed = 0;
-  if (input.useCashback) {
-    const result = await spendCashback({ userId: input.userId, requestedAmountKobo: input.amountKobo, description, relatedOrderId: undefined });
-    cashbackUsed = result.spent;
-  }
-  const walletAmount = input.amountKobo - cashbackUsed;
-
-  const { transaction } = await debitWalletForOrder({
-    userId: input.userId,
-    amount: walletAmount,
-    type: `${input.serviceType}_purchase`,
-    description,
-    metadata: { serviceId: input.serviceId, platform: input.platform, target: input.link, cashbackUsed, ...input.metadata },
-  });
-
   const now = new Date().toISOString();
   const id = db.collection('serviceOrders').doc().id;
   const reference = generateReference(REFERENCE_PREFIX[input.serviceType]);
+
+  const paymentResult = await debitConsumerPayment({
+    userId: input.userId,
+    totalKobo: input.amountKobo,
+    useCashback: input.useCashback ?? false,
+    description,
+    orderReference: reference,
+    serviceType: input.serviceType,
+    metadata: { serviceId: input.serviceId, platform: input.platform, target: input.link, ...input.metadata },
+  });
 
   const order: ServiceOrderRecord = {
     id,
@@ -88,18 +71,31 @@ export async function submitServiceOrder(input: SubmitServiceOrderInput): Promis
     amount: input.amountKobo,
     status: 'processing',
     reference,
-    transactionId: transaction.id,
+    transactionId: paymentResult.ngnTransactionId || paymentResult.hkcTransactionId || '',
     providerReference: input.metadata?.providerReference as string | undefined,
-    metadata: input.metadata,
+    metadata: {
+      ...input.metadata,
+      hkcUsed: paymentResult.hkcUsed,
+      cashbackUsed: paymentResult.cashbackUsed,
+      ngnUsed: paymentResult.ngnUsed,
+      hkcTransactionId: paymentResult.hkcTransactionId,
+      ngnTransactionId: paymentResult.ngnTransactionId,
+    },
     createdAt: now,
     updatedAt: now,
   };
 
   async function refundEverything(reason: string) {
-    await refundWalletDebit({ userId: input.userId, transactionId: transaction.id, amount: walletAmount, reason });
-    if (cashbackUsed > 0) {
-      await awardCashback({ userId: input.userId, amountKobo: cashbackUsed, description: `Refund: ${reason}`, relatedOrderId: id });
-    }
+    await refundConsumerPayment({
+      userId: input.userId,
+      hkcUsed: paymentResult.hkcUsed,
+      cashbackUsed: paymentResult.cashbackUsed,
+      ngnUsed: paymentResult.ngnUsed,
+      hkcTransactionId: paymentResult.hkcTransactionId,
+      ngnTransactionId: paymentResult.ngnTransactionId,
+      reason,
+      orderReference: reference,
+    });
   }
 
   try {
@@ -116,39 +112,27 @@ export async function submitServiceOrder(input: SubmitServiceOrderInput): Promis
     await refundEverything(`${input.serviceName} submission failed: ${(err as Error).message}`);
     order.status = 'failed';
     await orderRef(id).set(order);
-    throw new Error((err as Error).message || 'Purchase could not be completed. Your wallet/cashback has been refunded.');
+    throw new Error((err as Error).message || 'Purchase could not be completed. Your wallet has been refunded.');
   }
 
   return order;
 }
 
 /**
- * Refunds an existing service order by reading its wallet transaction and
- * reversing both the wallet debit and any cashback that was spent. Used by
- * asynchronous provider webhooks (e.g. VTU.ng) when a terminal status is
- * received after the order was already created.
+ * Refunds an existing service order by reversing all payment sources recorded
+ * in the order metadata. Used by asynchronous provider webhooks when a
+ * terminal failure status is received after the order was already created.
  */
 export async function refundServiceOrder(order: ServiceOrderRecord, reason: string): Promise<void> {
-  const txSnap = await db.collection('transactions').doc(order.transactionId).get();
-  if (!txSnap.exists) throw new Error('Wallet transaction for this order was not found.');
-  const tx = txSnap.data() as Transaction;
-
-  const walletDebit = tx.amount;
-  const cashbackUsed = (tx.metadata?.cashbackUsed as number) || 0;
-
-  await refundWalletDebit({
+  const meta = order.metadata || {};
+  await refundConsumerPayment({
     userId: order.userId,
-    transactionId: tx.id,
-    amount: walletDebit,
+    hkcUsed: (meta.hkcUsed as number) || 0,
+    cashbackUsed: (meta.cashbackUsed as number) || 0,
+    ngnUsed: (meta.ngnUsed as number) || 0,
+    hkcTransactionId: (meta.hkcTransactionId as string) || undefined,
+    ngnTransactionId: (meta.ngnTransactionId as string) || undefined,
     reason,
+    orderReference: order.reference,
   });
-
-  if (cashbackUsed > 0) {
-    await awardCashback({
-      userId: order.userId,
-      amountKobo: cashbackUsed,
-      description: `Refund: ${reason}`,
-      relatedOrderId: order.id,
-    });
-  }
 }

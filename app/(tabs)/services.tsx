@@ -1,13 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TextInput } from 'react-native';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { View, Text, ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
 import { GlassCard, ServiceCard, SectionHeader, SkeletonList, ErrorState } from '@components';
 import { Service } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 import { openService } from '@lib/serviceNavigation';
+
+const SERVICES_CACHE_KEY = '@thehk/services';
 
 export default function ServicesScreen() {
   const { colors } = useTheme();
@@ -17,19 +20,34 @@ export default function ServicesScreen() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const s = await repositories.service.getServices();
-        setServices(s);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load services');
-      } finally {
-        setLoading(false);
-      }
+  const refresh = useCallback(async () => {
+    setError('');
+    try {
+      const s = await repositories.service.getServices();
+      setServices(s);
+      await AsyncStorage.setItem(SERVICES_CACHE_KEY, JSON.stringify(s));
+    } catch (err: any) {
+      setError(err.message || 'Failed to load services');
+    } finally {
+      setLoading(false);
     }
-    load();
   }, []);
+
+  useEffect(() => {
+    async function loadCached() {
+      try {
+        const cached = await AsyncStorage.getItem(SERVICES_CACHE_KEY);
+        if (cached) {
+          setServices(JSON.parse(cached) as Service[]);
+          setLoading(false);
+        }
+      } catch {
+        // ignore cache read errors
+      }
+      refresh();
+    }
+    loadCached();
+  }, [refresh]);
 
   if (loading) {
     return (
@@ -41,7 +59,7 @@ export default function ServicesScreen() {
       </View>
     );
   }
-  if (error) return <ErrorState message={error} onRetry={() => setLoading(true)} />;
+  if (error) return <ErrorState message={error} onRetry={refresh} />;
 
   const normalizedSearch = search.toLowerCase();
 
@@ -57,7 +75,6 @@ export default function ServicesScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
       <View style={styles.inner}>
-        <Text style={[styles.title, { color: colors.primaryText }]}>All Services</Text>
         <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Ionicons name="search" size={18} color={colors.mutedText} />
           <TextInput
@@ -69,6 +86,12 @@ export default function ServicesScreen() {
           />
         </View>
 
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, { color: colors.primaryText }]}>All Services</Text>
+          <TouchableOpacity onPress={refresh} activeOpacity={0.8}>
+            <Ionicons name="refresh-outline" size={22} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
         <SectionHeader title="Popular Services" />
         <View style={styles.grid}>
           {popular.map((s) => (
@@ -94,10 +117,10 @@ export default function ServicesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   inner: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg },
   title: {
     fontSize: typography.sizes.xxl,
     fontWeight: typography.weights.bold as any,
-    marginBottom: spacing.lg,
   },
   search: {
     flexDirection: 'row',

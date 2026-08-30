@@ -61,6 +61,21 @@ export async function ensureReferralBalance(userId: string): Promise<ReferralBal
   return balance;
 }
 
+export async function getReferralBalance(userId: string): Promise<ReferralBalance> {
+  return ensureReferralBalance(userId);
+}
+
+export async function updateReferralBalance(userId: string, deltaKobo: number, description: string): Promise<void> {
+  const ref = referralBalanceRef(userId);
+  await db.runTransaction(async (t) => {
+    const snap = await t.get(ref);
+    const current = snap.exists ? (snap.data() as ReferralBalance).balance : 0;
+    const newBalance = current + deltaKobo;
+    if (newBalance < 0) throw new Error('Insufficient referral balance');
+    t.set(ref, { userId, balance: newBalance, updatedAt: new Date().toISOString() }, { merge: true });
+  });
+}
+
 /**
  * Applies a referral code to a newly registered user. Called by the client
  * shortly after sign-up (Firebase Auth's createUser flow has no room for

@@ -13,8 +13,8 @@ import { repositories } from '@repositories/mockRepository';
 import { useAuthStore } from '@stores/authStore';
 import { formatCurrency, formatDate, formatTime } from '@lib/formatters';
 
-const BANK_GEN_PRICE_KOBO = 100 * 100; // ₦100
-const BANK_GEN_POINTS_COST = 100; // 100 HK Points
+const BANK_GEN_PRICE_NAIRA = 100;
+const BANK_GEN_PRICE_KOBO = BANK_GEN_PRICE_NAIRA * 100;
 
 function randomNumeric(length: number): string {
   let result = '';
@@ -51,8 +51,8 @@ export default function OPayReceiptScreen() {
 
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [walletBalance, setWalletBalance] = useState(0);
-  const [pointsBalance, setPointsBalance] = useState(0);
+  const [hkcBalance, setHkcBalance] = useState(0);
+  const [ngnBalance, setNgnBalance] = useState(0);
   const [cashbackBalance] = useState(0);
   const [receipt, setReceipt] = useState<ReceiptRecord | null>(null);
   const [transactionNumber, setTransactionNumber] = useState('');
@@ -70,12 +70,12 @@ export default function OPayReceiptScreen() {
           return;
         }
         setBank(selected);
-        const [wallet, points] = await Promise.all([
+        const [wallet, hkc] = await Promise.all([
           repositories.wallet.getWallet(user?.id || ''),
-          repositories.rewards.getPointsBalance(),
+          repositories.rewards.getHkcBalance(),
         ]);
-        setWalletBalance(wallet.balance || 0);
-        setPointsBalance(points.balance || 0);
+        setNgnBalance(wallet.balance || 0);
+        setHkcBalance(hkc.balance || 0);
       } catch (err: any) {
         setError(err.message || 'Failed to load bank details');
       } finally {
@@ -104,19 +104,18 @@ export default function OPayReceiptScreen() {
     setShowPaymentSheet(true);
   }
 
-  async function handleConfirmPayment({ usePoints, useCashback }: { usePoints: boolean; useCashback: boolean }) {
+  async function handleConfirmPayment({ useCashback }: { useCashback: boolean }) {
     if (!bank) return;
     setShowPaymentSheet(false);
     setSubmitting(true);
     try {
       const result = await repositories.receipt.purchaseBankGenReceipt({
-        amount: Number(amount) * 100, // convert naira to kobo
+        amount: Number(amount),
         senderName,
         senderAccountNumber: senderAccount || undefined,
         receiverBankName: bank.name,
         receiverAccountNumber: receiverAccount,
         receiverAccountName: receiverName,
-        usePoints,
         useCashback,
       });
       setReceipt(result);
@@ -301,15 +300,13 @@ export default function OPayReceiptScreen() {
           title="Bank Gen Receipt"
           summaryRows={[
             { label: 'Service', value: 'OPay Receipt Generation' },
-            { label: 'Price', value: '₦100 or 100 HK Points' },
+            { label: 'Price', value: `₦${BANK_GEN_PRICE_NAIRA.toLocaleString()}` },
           ]}
           totalAmount={BANK_GEN_PRICE_KOBO}
-          walletBalance={walletBalance}
-          pointsBalance={pointsBalance}
+          hkcBalance={hkcBalance}
+          ngnBalance={ngnBalance}
           cashbackBalance={cashbackBalance}
           cashbackEligible={false}
-          allowPointsPayment
-          pointsCost={BANK_GEN_POINTS_COST}
           confirmLabel="Pay & Generate"
         />
       </View>

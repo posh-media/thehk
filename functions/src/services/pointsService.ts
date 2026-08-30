@@ -1,235 +1,145 @@
 import { db } from '../admin';
-import { debitWalletForOrder, refundWalletDebit } from './walletService';
-import { HK_POINTS_PER_NAIRA, MIN_POINTS_CONVERSION_NAIRA, fromKobo, toKobo } from '../config';
+import {
+  HkcTransaction,
+  Wallet,
+} from '../types';
 import { generateReference } from '../utils';
-import { createNotification } from './notificationService';
-import { PointsBalance, PointsTransaction } from '../types';
+import { MIN_HKC_CONVERSION_NAIRA, HKC_PER_NAIRA } from '../config';
+import { ensureWallet, debitWalletForOrder, creditHkc } from './walletService';
+import { getReferralBalance, updateReferralBalance } from './referralService';
 
-const SIGNUP_BONUS_POINTS = 500;
-
-function pointsRef(userId: string) {
-  return db.collection('points').doc(userId);
-}
-
-function pointsTxRef(id: string) {
-  return db.collection('pointsTransactions').doc(id);
-}
-
-function signupBonusRef(userId: string) {
-  return db.collection('signupBonuses').doc(userId);
-}
-
-export async function ensurePoints(userId: string): Promise<PointsBalance> {
-  const ref = pointsRef(userId);
-  const snap = await ref.get();
-  if (snap.exists) return snap.data() as PointsBalance;
-
-  const balance: PointsBalance = { userId, balance: 0, updatedAt: new Date().toISOString() };
-  await ref.set(balance);
-  return balance;
-}
-
-async function creditPoints(userId: string, points: number, entry: Omit<PointsTransaction, 'id' | 'userId' | 'points' | 'createdAt' | 'status'>): Promise<PointsTransaction> {
-  const now = new Date().toISOString();
-  const id = db.collection('pointsTransactions').doc().id;
-
-  await db.runTransaction(async (t) => {
-    const snap = await t.get(pointsRef(userId));
-    const current = snap.exists ? (snap.data() as PointsBalance).balance : 0;
-    t.set(pointsRef(userId), { userId, balance: current + points, updatedAt: now }, { merge: true });
-  });
-
-  const record: PointsTransaction = { id, userId, points, status: 'successful', createdAt: now, ...entry };
-  await pointsTxRef(id).set(record);
-  return record;
-}
-
-interface ConvertWalletInput {
-  userId: string;
-  amountNaira: number;
+function hkcTransactionRef(id: string) {
+  return db.collection('hkcTransactions').doc(id);
 }
 
 /**
- * Wallet -> HK Points. Server-authoritative: debits the wallet through the
- * existing `debitWalletForOrder` primitive (same one used by every
- * service order) and only then credits points - if the points credit
- * somehow fails, the wallet debit is reversed via `refundWalletDebit`
- * rather than leaving the user out of pocket.
+ * Returns the user's HKC balance view. HKC lives on the wallet document, so
+ * this is a thin wrapper over `ensureWallet`.
  */
-export async function convertWalletToPoints(input: ConvertWalletInput): Promise<PointsTransaction> {
-  if (!Number.isFinite(input.amountNaira) || input.amountNaira < MIN_POINTS_CONVERSION_NAIRA) {
-    throw new Error(`Minimum conversion amount is ₦${MIN_POINTS_CONVERSION_NAIRA}`);
-  }
-
-  const amountKobo = toKobo(input.amountNaira);
-  const points = Math.round(input.amountNaira * HK_POINTS_PER_NAIRA);
-  const reference = generateReference('HK-PTS');
-
-  const { transaction } = await debitWalletForOrder({
-    userId: input.userId,
-    amount: amountKobo,
-    type: 'points_conversion',
-    description: `Converted ₦${input.amountNaira.toLocaleString()} to ${points.toLocaleString()} HK Points`,
-  });
-
-  try {
-    return await creditPoints(input.userId, points, {
-      type: 'wallet_conversion',
-      amount: amountKobo,
-      description: `Converted from wallet (${reference})`,
-      reference,
-    });
-  } catch (err) {
-    await refundWalletDebit({
-      userId: input.userId,
-      transactionId: transaction.id,
-      amount: amountKobo,
-      reason: 'HK Points conversion failed after wallet debit',
-    });
-    throw err;
-  }
+export async function ensureHkcBalance(userId: string): Promise<{ userId: string; balance: number; updatedAt: string }> {
+  const wallet = await ensureWallet(userId);
+  return {
+    userId,
+    balance: wallet.hkcBalance ?? 0,
+    updatedAt: wallet.updatedAt,
+  };
 }
 
-interface ConvertReferralInput {
-  userId: string;
-  amountNaira: number;
-}
-
-/**
- * Referral balance -> HK Points, at the same authoritative
- * `HK_POINTS_PER_NAIRA` rate. Debits `referralBalances/{userId}` in its own
- * Firestore transaction (mirroring the wallet debit pattern) before
- * crediting points.
- */
-export async function convertReferralBalanceToPoints(input: ConvertReferralInput): Promise<PointsTransaction> {
-  if (!Number.isFinite(input.amountNaira) || input.amountNaira < MIN_POINTS_CONVERSION_NAIRA) {
-    throw new Error(`Minimum conversion amount is ₦${MIN_POINTS_CONVERSION_NAIRA}`);
-  }
-
-  const amountKobo = toKobo(input.amountNaira);
-  const points = Math.round(input.amountNaira * HK_POINTS_PER_NAIRA);
-  const reference = generateReference('HK-PTS');
-  const referralBalanceRef = db.collection('referralBalances').doc(input.userId);
-
-  await db.runTransaction(async (t) => {
-    const snap = await t.get(referralBalanceRef);
-    const current = snap.exists ? snap.data()!.balance : 0;
-    if (current < amountKobo) throw new Error('Insufficient referral balance');
-    t.set(referralBalanceRef, { userId: input.userId, balance: current - amountKobo, updatedAt: new Date().toISOString() }, { merge: true });
-  });
-
-  return creditPoints(input.userId, points, {
-    type: 'referral_conversion',
-    amount: amountKobo,
-    description: `Converted from referral balance (${reference})`,
-    reference,
-  });
-}
-
-export async function getPointsTransactionHistory(userId: string, limit = 50): Promise<PointsTransaction[]> {
+export async function getHkcTransactionHistory(userId: string, limit = 50): Promise<HkcTransaction[]> {
   const snap = await db
-    .collection('pointsTransactions')
+    .collection('hkcTransactions')
     .where('userId', '==', userId)
     .orderBy('createdAt', 'desc')
     .limit(limit)
     .get();
-  return snap.docs.map((d) => d.data() as PointsTransaction);
+  return snap.docs.map((d) => d.data() as HkcTransaction);
 }
 
 /**
- * Server-authoritative, idempotent signup bonus. A dedicated
- * `signupBonuses/{userId}` document acts as the one-time lock; the entire
- * check-and-credit runs inside a Firestore transaction so retries and
- * concurrent triggers cannot award the bonus twice.
+ * One-time 500 HKC signup bonus. Idempotent: a lock document in
+ * `signupBonuses/{userId}` prevents duplicate awards if the function is ever
+ * re-invoked or the auth trigger runs more than once.
  */
-export async function awardSignupBonus(userId: string): Promise<PointsTransaction | null> {
-  const bonusRef = signupBonusRef(userId);
+export async function awardSignupBonus(userId: string): Promise<HkcTransaction | null> {
+  const lockRef = db.collection('signupBonuses').doc(userId);
+  const hkcTxId = db.collection('hkcTransactions').doc().id;
   const now = new Date().toISOString();
-  const reference = generateReference('HK-WELCOME');
-  const txId = db.collection('pointsTransactions').doc().id;
 
-  try {
-    await db.runTransaction(async (t) => {
-      const bonusSnap = await t.get(bonusRef);
-      if (bonusSnap.exists) throw new Error('already-awarded');
+  return db.runTransaction(async (t) => {
+    const lockSnap = await t.get(lockRef);
+    if (lockSnap.exists) return null;
 
-      const pointsSnap = await t.get(pointsRef(userId));
-      const current = pointsSnap.exists ? (pointsSnap.data() as PointsBalance).balance : 0;
-      t.set(
-        pointsRef(userId),
-        { userId, balance: current + SIGNUP_BONUS_POINTS, updatedAt: now },
-        { merge: true }
-      );
-      t.set(bonusRef, { userId, points: SIGNUP_BONUS_POINTS, createdAt: now, transactionId: txId });
-    });
-  } catch (err: any) {
-    if (err.message === 'already-awarded') return null;
-    throw err;
+    const walletSnap = await t.get(db.collection('wallets').doc(userId));
+    const wallet = walletSnap.exists ? (walletSnap.data() as Wallet) : null;
+    const currentHkc = wallet?.hkcBalance ?? 0;
+    const newHkc = currentHkc + 500;
+
+    const hkcTx: HkcTransaction = {
+      id: hkcTxId,
+      userId,
+      type: 'signup_bonus',
+      amount: 500,
+      balanceAfter: newHkc,
+      description: 'Welcome bonus - 500 HK Coins',
+      reference: generateReference('HKC-SIGNUP'),
+      createdAt: now,
+    };
+
+    t.set(hkcTransactionRef(hkcTxId), hkcTx);
+    t.set(
+      db.collection('wallets').doc(userId),
+      {
+        userId,
+        hkcBalance: newHkc,
+        availableHkcBalance: newHkc,
+        pendingHkcBalance: 0,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+    t.set(lockRef, { userId, awardedAt: now, amount: 500 });
+    return hkcTx;
+  });
+}
+
+/**
+ * Converts NGN wallet balance to HKC. Debits the NGN wallet and credits HKC
+ * 1:1 (1 NGN = 1 HKC).
+ */
+export async function convertWalletToHkc(input: { userId: string; amountNaira: number }): Promise<HkcTransaction> {
+  const { userId, amountNaira } = input;
+  if (!Number.isFinite(amountNaira) || amountNaira < MIN_HKC_CONVERSION_NAIRA) {
+    throw new Error(`Minimum conversion amount is ₦${MIN_HKC_CONVERSION_NAIRA}`);
   }
 
-  const record: PointsTransaction = {
-    id: txId,
+  await ensureWallet(userId);
+  const amountKobo = Math.round(amountNaira * 100);
+  const reference = generateReference('HKC-CONV');
+
+  await debitWalletForOrder({
     userId,
-    type: 'signup_bonus',
-    points: SIGNUP_BONUS_POINTS,
-    description: 'Welcome bonus: 500 HK Points',
-    status: 'successful',
+    amount: amountKobo,
+    type: 'hkc_conversion',
+    description: `Converted ₦${amountNaira} to HKC`,
+    metadata: { conversionType: 'wallet_to_hkc', nairaAmount: amountNaira },
+  });
+
+  const hkcAmount = Math.round(amountNaira * HKC_PER_NAIRA);
+  return creditHkc({
+    userId,
+    amount: hkcAmount,
+    type: 'conversion',
+    description: `Converted ₦${amountNaira} to ${hkcAmount} HK Coins`,
     reference,
-    createdAt: now,
-  };
-  await pointsTxRef(txId).set(record);
-
-  await createNotification({
-    userId,
-    title: 'Welcome Bonus',
-    body: "🎉 Welcome to THE-HK! You've received 500 HK Points as your signup bonus.",
-    category: 'reward',
+    metadata: { nairaAmount: amountNaira, koboAmount: amountKobo },
   });
-
-  return record;
-}
-
-interface DebitPointsInput {
-  userId: string;
-  points: number;
-  description: string;
-  reference?: string;
 }
 
 /**
- * Server-authoritative HK Points debit, mirroring the wallet debit pattern.
- * Rejects if the user does not have enough points and records a negative
- * points transaction for audit.
+ * Converts referral balance to HKC. Debits the referral balance and credits
+ * HKC 1:1.
  */
-export async function debitPoints(input: DebitPointsInput): Promise<PointsTransaction> {
-  if (!Number.isFinite(input.points) || input.points <= 0) {
-    throw new Error('Points amount must be a positive number');
+export async function convertReferralBalanceToHkc(input: { userId: string; amountNaira: number }): Promise<HkcTransaction> {
+  const { userId, amountNaira } = input;
+  if (!Number.isFinite(amountNaira) || amountNaira < MIN_HKC_CONVERSION_NAIRA) {
+    throw new Error(`Minimum conversion amount is ₦${MIN_HKC_CONVERSION_NAIRA}`);
   }
 
-  const now = new Date().toISOString();
-  const id = db.collection('pointsTransactions').doc().id;
+  const amountKobo = Math.round(amountNaira * 100);
+  const referral = await getReferralBalance(userId);
+  if (referral.balance < amountKobo) {
+    throw new Error('Insufficient referral balance');
+  }
 
-  await db.runTransaction(async (t) => {
-    const snap = await t.get(pointsRef(input.userId));
-    const current = snap.exists ? (snap.data() as PointsBalance).balance : 0;
-    if (current < input.points) {
-      throw new Error('Insufficient HK Points balance');
-    }
-    t.set(pointsRef(input.userId), { userId: input.userId, balance: current - input.points, updatedAt: now }, { merge: true });
+  await updateReferralBalance(userId, -amountKobo, `Converted ₦${amountNaira} referral balance to HKC`);
+
+  const hkcAmount = Math.round(amountNaira * HKC_PER_NAIRA);
+  return creditHkc({
+    userId,
+    amount: hkcAmount,
+    type: 'conversion',
+    description: `Converted ₦${amountNaira} referral balance to ${hkcAmount} HK Coins`,
+    reference: generateReference('HKC-REF'),
+    metadata: { source: 'referral', nairaAmount: amountNaira, koboAmount: amountKobo },
   });
-
-  const record: PointsTransaction = {
-    id,
-    userId: input.userId,
-    type: 'redeemed',
-    points: -input.points,
-    description: input.description,
-    status: 'successful',
-    reference: input.reference || generateReference('HK-PTS'),
-    createdAt: now,
-  };
-  await pointsTxRef(id).set(record);
-  return record;
 }
-
-export { fromKobo };

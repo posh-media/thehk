@@ -105,7 +105,7 @@ export async function handleWebhook(input: HandleWebhookInput) {
       await createNotification({
         userId,
         title: 'Wallet Funded',
-        body: `Your wallet was credited with ₦${fromKobo(result.amount).toLocaleString()}.`,
+        body: `Your wallet was credited with ${(result.amount / CURRENCY.minorUnit).toLocaleString()} HK Coins.`,
         category: 'transaction',
         actionUrl: '/wallet',
       });
