@@ -11,7 +11,7 @@ export const BILL_PROVIDER = process.env.BILL_PROVIDER || 'reloadly';
 
 export const SECRETS = {
   paystack: {
-    secretKey: process.env.PAYSTACK_SECRET_KEY || '',
+    secretKey: process.env.PAYSTACK_SECRET_KEY || functions.config().paystack?.secretkey || '',
     publicKey: process.env.PAYSTACK_PUBLIC_KEY || functions.config().paystack?.publickey || '',
     webhookSecret: process.env.PAYSTACK_WEBHOOK_SECRET || functions.config().paystack?.webhooksecret || '',
   },
