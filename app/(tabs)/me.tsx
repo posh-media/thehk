@@ -63,7 +63,15 @@ export default function ProfileScreen() {
           ))}
         </GlassCard>
 
-        <GlassButton title="Logout" variant="danger" onPress={signOut} style={styles.logout} />
+        <GlassButton
+          title="Logout"
+          variant="danger"
+          onPress={async () => {
+            await signOut();
+            router.replace('/login');
+          }}
+          style={styles.logout}
+        />
       </View>
     </ScrollView>
   );

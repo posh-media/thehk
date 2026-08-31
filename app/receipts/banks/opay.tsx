@@ -162,7 +162,7 @@ export default function OPayReceiptScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
       <View style={styles.inner}>
-        <Header title="Share Receipt" />
+        <Header title="Generate Receipt" />
 
         {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
 

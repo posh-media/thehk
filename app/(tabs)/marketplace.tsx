@@ -8,7 +8,7 @@ import { GlassCard, ProductCard, SectionHeader, SkeletonList, ErrorState, EmptyS
 import { Listing } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 
-const categories = ['All', 'Socials', 'Gaming', 'Streaming', 'Tools'];
+const categories = ['All', 'Socials', 'Gaming', 'Streaming', 'Tools', 'Others'];
 
 export default function MarketplaceScreen() {
   const { colors } = useTheme();
@@ -18,6 +18,7 @@ export default function MarketplaceScreen() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -34,7 +35,7 @@ export default function MarketplaceScreen() {
       }
     }
     load();
-  }, [search, category]);
+  }, [search, category, retry]);
 
   if (loading) {
     return (
@@ -46,7 +47,7 @@ export default function MarketplaceScreen() {
       </View>
     );
   }
-  if (error) return <ErrorState message={error} onRetry={() => setLoading(true)} />;
+  if (error) return <ErrorState message={error} onRetry={() => { setRetry((r) => r + 1); setLoading(true); setError(''); }} />;
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>

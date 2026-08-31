@@ -83,6 +83,25 @@ export async function awardSignupBonus(userId: string): Promise<HkcTransaction |
 }
 
 /**
+ * Safe migration for existing users created before the signup bonus trigger.
+ * Awards 500 HKC only if the user has no signup bonus lock document and no
+ * signup_bonus HKC transaction. Calling this multiple times is idempotent.
+ */
+export async function awardMissingSignupBonus(userId: string): Promise<HkcTransaction | null> {
+  const lockRef = db.collection('signupBonuses').doc(userId);
+  const existingTxSnap = await db
+    .collection('hkcTransactions')
+    .where('userId', '==', userId)
+    .where('type', '==', 'signup_bonus')
+    .limit(1)
+    .get();
+  if (!existingTxSnap.empty) return null;
+  const lock = await lockRef.get();
+  if (lock.exists) return null;
+  return awardSignupBonus(userId);
+}
+
+/**
  * Converts NGN wallet balance to HKC. Debits the NGN wallet and credits HKC
  * 1:1 (1 NGN = 1 HKC).
  */

@@ -7,11 +7,25 @@ import { GlassCard, Header, LoadingState, ErrorState } from '@components';
 import { Bank } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 
+const BANK_ORDER = ['OPay', 'Kuda', 'United Bank for Africa', 'Access Bank', 'Guaranty Trust Bank', 'First Bank of Nigeria', 'Zenith Bank', 'Fidelity Bank', 'Union Bank', 'PalmPay'];
+
+function sortBanks(banks: Bank[]) {
+  return banks.sort((a, b) => {
+    const ai = BANK_ORDER.indexOf(a.name);
+    const bi = BANK_ORDER.indexOf(b.name);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 export default function BankSelectionScreen() {
   const { colors } = useTheme();
   const router = useRouter();
 
   const [banks, setBanks] = useState<Bank[]>([]);
+  const [wallets, setWallets] = useState<Bank[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
@@ -20,8 +34,10 @@ export default function BankSelectionScreen() {
     async function load() {
       try {
         const data = await repositories.bank.getBanks();
-        const sorted = data.sort((a, b) => Number(b.implemented) - Number(a.implemented));
-        setBanks(sorted);
+        const bankItems = data.filter((b) => b.category === 'bank');
+        const walletItems = data.filter((b) => b.category === 'wallet');
+        setBanks(sortBanks(bankItems));
+        setWallets(walletItems);
       } catch (err: any) {
         setError(err.message || 'Failed to load banks');
       } finally {
@@ -42,30 +58,40 @@ export default function BankSelectionScreen() {
     router.push(`/receipts/generate?bankId=${bank.id}` as any);
   }
 
+  function renderGrid(items: Bank[]) {
+    return (
+      <View style={styles.grid}>
+        {items.map((bank) => (
+          <TouchableOpacity key={bank.id} activeOpacity={0.8} onPress={() => handleSelect(bank)} style={styles.bankWrapper}>
+            <GlassCard style={styles.card}>
+              <View style={styles.logoBox}>
+                <Image
+                  source={bank.logoAsset ? bank.logoAsset : { uri: bank.logoUrl }}
+                  style={styles.logo}
+                  resizeMode="contain"
+                  accessibilityLabel={bank.name}
+                />
+              </View>
+              <Text style={[styles.name, { color: colors.primaryText }]} numberOfLines={1}>
+                {bank.name}
+              </Text>
+            </GlassCard>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
       <View style={styles.inner}>
-        <Header title="Select Bank" subtitle="Choose a bank to generate a receipt for" />
+        <Header title="Select Institution" subtitle="Choose a bank or wallet to generate a receipt for" />
 
-        <View style={styles.grid}>
-          {banks.map((bank) => (
-            <TouchableOpacity key={bank.id} activeOpacity={0.8} onPress={() => handleSelect(bank)} style={styles.bankWrapper}>
-              <GlassCard style={styles.card}>
-                <View style={styles.logoBox}>
-                  <Image
-                    source={bank.logoAsset ? bank.logoAsset : { uri: bank.logoUrl }}
-                    style={styles.logo}
-                    resizeMode="contain"
-                    accessibilityLabel={bank.name}
-                  />
-                </View>
-                <Text style={[styles.name, { color: colors.primaryText }]} numberOfLines={1}>
-                  {bank.name}
-                </Text>
-              </GlassCard>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <Text style={[styles.sectionTitle, { color: colors.primaryText }]}>Banks</Text>
+        {renderGrid(banks)}
+
+        <Text style={[styles.sectionTitle, { color: colors.primaryText }]}>Wallets</Text>
+        {renderGrid(wallets)}
       </View>
     </ScrollView>
   );
@@ -74,6 +100,12 @@ export default function BankSelectionScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   inner: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  sectionTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold as any,
+    marginBottom: spacing.md,
+    marginTop: spacing.lg,
+  },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

@@ -44,6 +44,10 @@ export const CURRENCY = {
 
 export const MIN_FUNDING_AMOUNT = 500; // NGN
 
+// Public redirect URL used by Paystack after a funding payment.
+// This can be moved to an environment variable when the production domain changes.
+export const PAYSTACK_CALLBACK_URL = process.env.PAYSTACK_CALLBACK_URL || 'https://thehk.vercel.app/payment-success';
+
 // HK Coins: single authoritative conversion rate. HKC is always computed from
 // a naira amount as `amountNaira * HKC_PER_NAIRA`.
 // Kept as one constant (rather than hardcoded across screens/functions) so

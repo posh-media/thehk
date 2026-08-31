@@ -182,18 +182,20 @@ export default function HomeScreen() {
         <SectionHeader title="Services" action="View All" onAction={() => router.push('/(tabs)/services')} />
         <View style={styles.servicesGrid}>
           {servicesLoading
-            ? Array.from({ length: 6 }).map((_, i) => (
+            ? Array.from({ length: 8 }).map((_, i) => (
                 <View key={i} style={styles.serviceSkeletonWrapper}>
                   <SkeletonCard style={styles.serviceSkeleton} />
                 </View>
               ))
-            : services
-                .filter((s) => s.isPopular)
-                .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
-                .slice(0, isDesktop ? 8 : 6)
-                .map((s) => (
-                  <ServiceCard key={s.id} item={s} onPress={() => openService(router, s)} size={isDesktop ? 'sm' : 'md'} />
-                ))}
+            : [
+                ...services
+                  .filter((s) => s.isPopular && s.visible !== false)
+                  .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                  .slice(0, 7),
+                { id: 'svc-more', name: 'More', icon: 'grid', route: '/(tabs)/services', isPopular: true, visible: true, implemented: true, categoryId: 'cat-upcoming', sortOrder: 99, description: 'View all services' } as Service,
+              ].map((s) => (
+                <ServiceCard key={s.id} item={s} onPress={() => openService(router, s)} size="md" />
+              ))}
         </View>
 
         <SectionHeader title="Recent Transactions" action="See All" onAction={() => router.push('/wallet/transactions')} />

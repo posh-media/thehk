@@ -62,6 +62,15 @@ import {
   mockWallet,
   mockTransactions,
   mockNotifications,
+  mockServiceCategories,
+  mockServices,
+  mockSocialProfiles,
+  mockListings,
+  mockMarketplaceOrders,
+  mockRewards,
+  mockSupportTickets,
+  mockTutorials,
+  mockBanks,
 } from '@/data/mocks';
 import { toMinorUnits } from '@lib/formatters';
 import { mapCallableError } from '@lib/errors';
@@ -164,6 +173,8 @@ class FirebaseAuthRepository implements AuthRepository {
         if (fu) {
           this.currentUser = await syncUserProfile(fu);
           store.signIn(this.currentUser);
+          // Fire-and-forget signup bonus migration for existing users.
+          getCallable<{}, void>('ensureSignupBonus')({}).catch(() => undefined);
         } else {
           this.currentUser = null;
           store.signOut();
@@ -275,6 +286,12 @@ class FirebaseWalletRepository implements WalletRepository {
     return data.payment;
   }
 
+  async verifyPaystackPayment(reference: string): Promise<{ processed: boolean; message: string; transactionId?: string }> {
+    const fn = getCallable<{ reference: string }, { processed: boolean; message: string; transactionId?: string }>('verifyPaystackPaymentFn');
+    const { data } = await fn({ reference });
+    return data;
+  }
+
   async withdraw(
     _userId: string,
     withdrawal: Omit<Withdrawal, 'id' | 'userId' | 'status' | 'reference' | 'createdAt' | 'updatedAt'>
@@ -348,10 +365,9 @@ interface RemoteSocialService {
 // (see PHASE_3_COMPLETION_REPORT.md). Social media services are real,
 // backed by The Owlet via Cloud Functions.
 class FirebaseServiceRepository implements ServiceRepository {
-  async getCategories() { return (await import('@/data/mocks')).mockServiceCategories; }
+  async getCategories() { return mockServiceCategories; }
 
   async getServices(categoryId?: string) {
-    const { mockServices } = await import('@/data/mocks');
     // Static defaults define the visible catalog. The `serviceVisibility`
     // field on `AdminPlatformConfig` is the future override point: when the
     // admin panel writes visibility/rollout flags, merge them here with
@@ -508,16 +524,21 @@ function mapGiftCardProduct(p: { id: string; brandId: string; brandName: string;
 }
 
 class MockFallbackSocialProfileRepository {
-  async getProfiles(): Promise<any[]> { return (await import('@/data/mocks')).mockSocialProfiles; }
+  async getProfiles(): Promise<any[]> { return mockSocialProfiles; }
   async saveProfile(): Promise<any> { throw new Error('Social profile save not yet implemented in Phase 2'); }
   async deleteProfile(): Promise<void> { return; }
 }
 
 class MockFallbackMarketplaceRepository {
   async getListings(options?: { search?: string; category?: string }): Promise<any[]> {
-    let listings = (await import('@/data/mocks')).mockListings as any[];
+    let listings = mockListings as any[];
     if (options?.category) {
-      listings = listings.filter((l) => l.product?.category === options!.category);
+      const explicitCategories = ['Socials', 'Gaming', 'Streaming', 'Tools'];
+      if (options.category === 'Others') {
+        listings = listings.filter((l) => !explicitCategories.includes(l.product?.category));
+      } else {
+        listings = listings.filter((l) => l.product?.category === options!.category);
+      }
     }
     if (options?.search) {
       const q = options.search.toLowerCase();
@@ -525,10 +546,10 @@ class MockFallbackMarketplaceRepository {
     }
     return listings;
   }
-  async getListing(id: string): Promise<any | null> { return (await import('@/data/mocks')).mockListings.find((l) => l.id === id) || null; }
+  async getListing(id: string): Promise<any | null> { return mockListings.find((l) => l.id === id) || null; }
   async createListing(): Promise<any> { throw new Error('Create listing not yet implemented in Phase 2'); }
   async getMyListings(): Promise<any[]> { return []; }
-  async getOrders(): Promise<any[]> { return (await import('@/data/mocks')).mockMarketplaceOrders; }
+  async getOrders(): Promise<any[]> { return mockMarketplaceOrders; }
   async placeOrder(): Promise<any> { throw new Error('Marketplace order not yet implemented in Phase 2'); }
   async deliverOrder(): Promise<void> { throw new Error('Delivery not yet implemented in Phase 2'); }
 }
@@ -549,7 +570,7 @@ class FirebaseRewardsRepository implements RewardsRepository {
     await fn({ code });
   }
 
-  async getRewards(_userId?: string): Promise<Reward[]> { return (await import('@/data/mocks')).mockRewards; }
+  async getRewards(_userId?: string): Promise<Reward[]> { return mockRewards; }
 
   async getHkcBalance(): Promise<HkcBalance> {
     const fn = getCallable<{}, HkcBalance>('getHkc');
@@ -626,9 +647,9 @@ class FirebaseAdminRepository implements AdminRepository {
 // The Dispute Center is real (Phase 4 continuation), backed by Cloud
 // Functions - see functions/src/services/disputeService.ts.
 class FirebaseSupportRepository implements SupportRepository {
-  async getTickets(): Promise<any[]> { return (await import('@/data/mocks')).mockSupportTickets; }
+  async getTickets(): Promise<any[]> { return mockSupportTickets; }
   async createTicket(): Promise<any> { throw new Error('Ticket creation not yet implemented'); }
-  async getTutorials(): Promise<any[]> { return (await import('@/data/mocks')).mockTutorials; }
+  async getTutorials(): Promise<any[]> { return mockTutorials; }
 
   async createDispute(input: { transactionId?: string; orderReference?: string; category: string; subject: string; description: string }): Promise<Dispute> {
     const fn = getCallable<typeof input, { dispute: Dispute }>('createDisputeFn');
@@ -648,7 +669,7 @@ class FirebaseSupportRepository implements SupportRepository {
 // Account Number" endpoint (functions/src/services/bankService.ts) - the
 // same provider/secret already used for wallet funding.
 class FirebaseBankRepository implements BankRepository {
-  async getBanks(): Promise<any[]> { return (await import('@/data/mocks')).mockBanks; }
+  async getBanks(): Promise<any[]> { return mockBanks; }
 
   async verifyAccount(bankCode: string, accountNumber: string): Promise<{ accountName: string }> {
     const fn = getCallable<{ bankCode: string; accountNumber: string }, { accountName: string }>('verifyBankAccount');

@@ -24,7 +24,6 @@ import { useAuthStore } from '@stores/authStore';
 import { storage } from '@infrastructure/firebase';
 import { repositories } from '@repositories/mockRepository';
 import { formatPhoneNumber } from '@lib/formatters';
-import type { UserPreferences } from '@/types/domain';
 
 const countries = [
   'Nigeria',
@@ -34,12 +33,6 @@ const countries = [
   'United States',
   'United Kingdom',
   'Canada',
-];
-
-const appearanceOptions: { label: string; value: UserPreferences['appearance']; icon: string }[] = [
-  { label: 'System', value: 'system', icon: 'desktop-outline' },
-  { label: 'Dark', value: 'dark', icon: 'moon-outline' },
-  { label: 'Light', value: 'light', icon: 'sunny-outline' },
 ];
 
 function parseDate(value: string): Date {
@@ -68,12 +61,6 @@ export default function PersonalInfoScreen() {
   const [username, setUsername] = useState(user?.username || '');
   const [country, setCountry] = useState(user?.country || '');
   const [dateOfBirth, setDateOfBirth] = useState(user?.dateOfBirth || '');
-  const [preferences, setPreferences] = useState<UserPreferences>({
-    emailNotification: true,
-    pushNotification: true,
-    appearance: 'system',
-    ...user?.preferences,
-  });
 
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -146,7 +133,6 @@ export default function PersonalInfoScreen() {
         username,
         country,
         dateOfBirth,
-        preferences,
       });
       setUser(updated);
       setSuccess(true);
@@ -218,51 +204,6 @@ export default function PersonalInfoScreen() {
               />
             </View>
           </TouchableOpacity>
-
-          <Text style={[styles.sectionLabel, { color: colors.secondaryText }]}>Preferences</Text>
-
-          <View style={[styles.preferenceRow, { borderBottomColor: colors.divider }]}>
-            <Text style={[styles.preferenceLabel, { color: colors.primaryText }]}>Email Notifications</Text>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setPreferences((p) => ({ ...p, emailNotification: !p.emailNotification }))}
-              style={[styles.toggleTrack, { backgroundColor: preferences.emailNotification ? colors.primary : colors.border }]}
-            >
-              <View style={[styles.toggleThumb, { backgroundColor: colors.inverseText, marginLeft: preferences.emailNotification ? 18 : 2 }]} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={[styles.preferenceRow, { borderBottomColor: colors.divider }]}>
-            <Text style={[styles.preferenceLabel, { color: colors.primaryText }]}>Push Notifications</Text>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setPreferences((p) => ({ ...p, pushNotification: !p.pushNotification }))}
-              style={[styles.toggleTrack, { backgroundColor: preferences.pushNotification ? colors.primary : colors.border }]}
-            >
-              <View style={[styles.toggleThumb, { backgroundColor: colors.inverseText, marginLeft: preferences.pushNotification ? 18 : 2 }]} />
-            </TouchableOpacity>
-          </View>
-
-          <Text style={[styles.sectionLabel, { color: colors.secondaryText }]}>Appearance</Text>
-          <View style={styles.themeRow}>
-            {appearanceOptions.map((option) => {
-              const active = preferences.appearance === option.value;
-              return (
-                <TouchableOpacity
-                  key={option.value}
-                  activeOpacity={0.8}
-                  onPress={() => setPreferences((p) => ({ ...p, appearance: option.value }))}
-                  style={[
-                    styles.themeButton,
-                    { backgroundColor: active ? colors.primary : colors.surface },
-                  ]}
-                >
-                  <Ionicons name={option.icon as any} size={18} color={active ? colors.inverseText : colors.primaryText} />
-                  <Text style={[styles.themeLabel, { color: active ? colors.inverseText : colors.primaryText }]}>{option.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
 
           {success && (
             <View style={[styles.success, { backgroundColor: colors.successSurface }]}>

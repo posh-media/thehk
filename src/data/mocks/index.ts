@@ -188,6 +188,7 @@ export const mockServiceCategories: ServiceCategory[] = [
   { id: 'cat-gaming', name: 'Gaming', icon: 'game-controller', color: '#EF4444', description: 'Game credits and subscriptions' },
   { id: 'cat-tools', name: 'Tools', icon: 'laptop', color: '#6B7280', description: 'Software accounts and tools' },
   { id: 'cat-bankgen', name: 'Bank Gen', icon: 'receipt', color: '#14B8A6', description: 'Generate custom bank receipts' },
+  { id: 'cat-refer', name: 'Refer', icon: 'people', color: '#8B5CF6', description: 'Invite friends and earn rewards' },
   { id: 'cat-upcoming', name: 'Upcoming', icon: 'rocket', color: '#64748B', description: 'New services coming soon' },
 ];
 
@@ -199,6 +200,7 @@ export const mockServices: Service[] = [
   { id: 'svc-smm', categoryId: 'cat-smm', name: 'SMM', description: 'Boost followers and engagement', icon: 'people', isActive: true, visible: true, implemented: true, isPopular: true, sortOrder: 4, route: '/services/smm' },
   { id: 'svc-giftcards', categoryId: 'cat-giftcards', name: 'Gift Cards', description: 'Trade gift cards securely', icon: 'gift', isActive: true, visible: true, implemented: true, isPopular: true, sortOrder: 5, route: '/services/gift-cards' },
   { id: 'svc-bankgen', categoryId: 'cat-bankgen', name: 'Bank Gen', description: 'Generate custom bank receipts', icon: 'receipt', isActive: true, visible: true, implemented: true, isPopular: true, sortOrder: 6, route: '/receipts/banks' },
+  { id: 'svc-refer', categoryId: 'cat-refer', name: 'Refer', description: 'Invite friends and earn rewards', icon: 'people', isActive: true, visible: true, implemented: true, isPopular: true, sortOrder: 7, route: '/rewards/referrals' },
 
   // Existing but not promoted to the Home / Popular section
   { id: 'svc-virtual', categoryId: 'cat-virtual', name: 'Virtual Numbers', description: 'Virtual numbers for verification', icon: 'call', isActive: true, visible: true, implemented: true, sortOrder: 7, route: '/services/virtual-numbers' },
@@ -257,6 +259,7 @@ export const mockProducts: Product[] = [
   { id: 'prod-004', name: 'Canva Pro Lifetime', category: 'Tools', description: 'Canva Pro education account. Long-term warranty.', images: [productImages.canva], type: 'Account', yearCreated: '2024', warranty: '1 year', accountLevel: 'Pro', shortDescription: 'Lifetime Pro access' },
   { id: 'prod-005', name: 'Steam Wallet $50', category: 'Gaming', description: 'Steam wallet gift code worth $50 USD.', images: [productImages.steam], type: 'Code', yearCreated: '2024', warranty: 'N/A', accountLevel: 'N/A', shortDescription: 'Global USD code' },
   { id: 'prod-006', name: 'PlayStation Plus Extra', category: 'Gaming', description: 'PSN Extra subscription. 3 months.', images: [productImages.psn], type: 'Account', yearCreated: '2024', warranty: '90 days', accountLevel: 'Extra', shortDescription: '3 months subscription' },
+  { id: 'prod-007', name: 'Adobe Creative Cloud', category: 'Others', description: '1-month shared Adobe Creative Cloud access.', images: [productImages.canva], type: 'Account', yearCreated: '2024', warranty: '30 days', accountLevel: 'Pro', shortDescription: 'Creative Cloud shared account' },
 ];
 
 export const mockListings: Listing[] = [
@@ -266,6 +269,7 @@ export const mockListings: Listing[] = [
   { id: 'lst-004', sellerId: 'u-004', productId: 'prod-004', product: mockProducts[3], price: 300000, stock: 20, status: 'active', createdAt: '2024-08-07T10:00:00Z', updatedAt: '2024-08-07T10:00:00Z' },
   { id: 'lst-005', sellerId: 'u-005', productId: 'prod-005', product: mockProducts[4], price: 3500000, stock: 3, status: 'sold_out', createdAt: '2024-08-06T10:00:00Z', updatedAt: '2024-08-06T10:00:00Z' },
   { id: 'lst-006', sellerId: mockUser.id, productId: 'prod-006', product: mockProducts[5], price: 1200000, stock: 7, status: 'pending_review', createdAt: '2024-08-18T10:00:00Z', updatedAt: '2024-08-18T10:00:00Z' },
+  { id: 'lst-007', sellerId: 'u-005', productId: 'prod-007', product: mockProducts[6], price: 180000, stock: 4, status: 'active', createdAt: '2024-08-17T10:00:00Z', updatedAt: '2024-08-17T10:00:00Z' },
 ];
 
 export const mockMarketplaceOrders: MarketplaceOrder[] = [

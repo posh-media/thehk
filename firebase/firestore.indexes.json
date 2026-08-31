@@ -89,6 +89,14 @@
       ]
     },
     {
+      "collectionGroup": "hkcTransactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "referrals",
       "queryScope": "COLLECTION",
       "fields": [

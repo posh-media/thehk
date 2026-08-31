@@ -1,13 +1,13 @@
 import * as functions from 'firebase-functions';
 import { db } from './admin';
 import { createWithdrawal, ensureWallet, createPayment } from './services/walletService';
-import { initiateFunding, handleWebhook } from './services/paymentService';
+import { initiateFunding, handleWebhook, verifyPaystackPayment } from './services/paymentService';
 import { getSocialCatalog, placeSocialOrder, refreshSocialOrderStatus } from './services/socialService';
 import { listNetworkOperators, detectNetworkOperator, listDataPlans, placeAirtimeOrder, placeDataOrder } from './services/utilityService';
 import { listBillCategories, listBillers, verifyBillCustomer, payBill } from './services/billService';
 import { listGiftCardProducts, getGiftCardProduct, placeGiftCardOrder, getGiftCardRedeemCodes } from './services/giftCardService';
 import { assignReferralCode, applyReferralCode, getReferralSummary } from './services/referralService';
-import { ensureHkcBalance, convertWalletToHkc as convertWalletToHkcImpl, convertReferralBalanceToHkc, getHkcTransactionHistory, awardSignupBonus } from './services/pointsService';
+import { ensureHkcBalance, convertWalletToHkc as convertWalletToHkcImpl, convertReferralBalanceToHkc, getHkcTransactionHistory, awardSignupBonus, awardMissingSignupBonus } from './services/pointsService';
 import { getPlatformConfig } from './services/adminPanelService';
 import { ensureCashbackBalance, getCashbackHistory } from './services/cashbackService';
 import { listVoucherCatalog, listUserVouchers, claimVoucher, redeemVoucher } from './services/rewardsService';
@@ -178,6 +178,20 @@ export const convertWalletToHkc = functions
     }
   });
 
+export const ensureSignupBonus = functions
+  .region(REGION)
+  .runWith(RUNTIME_OPTS)
+  .https.onCall(async (_data, context) => {
+    const uid = requireAuth(context);
+    try {
+      return await awardMissingSignupBonus(uid);
+    } catch (err) {
+      console.error('ensureSignupBonus failed:', err);
+      // Never fail the user's request because of a bonus migration issue.
+      return null;
+    }
+  });
+
 export const getHkcHistory = functions
   .region(REGION)
   .runWith(RUNTIME_OPTS)
@@ -248,6 +262,20 @@ export const initiateWalletFunding = functions
       provider,
     });
     return result;
+  });
+
+export const verifyPaystackPaymentFn = functions
+  .region(REGION)
+  .runWith(RUNTIME_OPTS)
+  .https.onCall(async (data, context) => {
+    const uid = requireAuth(context);
+    if (!data?.reference) throw new functions.https.HttpsError('invalid-argument', 'reference is required.');
+    try {
+      const result = await verifyPaystackPayment(String(data.reference));
+      return result;
+    } catch (err) {
+      throw new functions.https.HttpsError('failed-precondition', (err as Error).message);
+    }
   });
 
 export const initiateWithdrawal = functions

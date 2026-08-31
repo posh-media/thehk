@@ -23,3 +23,15 @@ export interface PaymentProvider {
   initialize(input: InitializePaymentInput): Promise<InitializePaymentResult>;
   handleWebhook(rawPayload: string, signature: string | undefined, secret: string): WebhookVerificationResult | null;
 }
+
+export interface ProviderVerificationResult {
+  reference: string;
+  providerReference: string;
+  providerStatus: 'successful' | 'failed' | 'abandoned';
+  amount: number; // kobo
+  currency: string;
+}
+
+export interface PaymentVerifier {
+  verifyTransaction(reference: string, secret: string): Promise<ProviderVerificationResult>;
+}

@@ -1,8 +1,8 @@
-import { PaymentProvider, InitializePaymentInput, InitializePaymentResult, WebhookVerificationResult } from './paymentProvider';
+import { PaymentProvider, InitializePaymentInput, InitializePaymentResult, WebhookVerificationResult, PaymentVerifier, ProviderVerificationResult } from './paymentProvider';
 import { hmacSha512 } from '../utils';
 import { CURRENCY } from '../config';
 
-export class PaystackProvider implements PaymentProvider {
+export class PaystackProvider implements PaymentProvider, PaymentVerifier {
   name = 'paystack';
   private secretKey: string;
 
@@ -38,6 +38,41 @@ export class PaystackProvider implements PaymentProvider {
     return {
       authorizationUrl: data.data.authorization_url,
       providerReference: data.data.reference,
+    };
+  }
+
+  async verifyTransaction(reference: string, secret: string): Promise<ProviderVerificationResult> {
+    const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${secret}` },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Paystack verification failed: ${error}`);
+    }
+
+    const payload = (await response.json()) as {
+      status: boolean;
+      message?: string;
+      data: {
+        reference: string;
+        status: string;
+        amount: number;
+        currency: string;
+      };
+    };
+
+    if (!payload.status) {
+      throw new Error(`Paystack verification error: ${payload.message}`);
+    }
+
+    return {
+      reference,
+      providerReference: payload.data.reference,
+      providerStatus: payload.data.status === 'success' ? 'successful' : payload.data.status === 'abandoned' ? 'abandoned' : 'failed',
+      amount: payload.data.amount,
+      currency: payload.data.currency || CURRENCY.code,
     };
   }
 

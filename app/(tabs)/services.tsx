@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
-import { GlassCard, ServiceCard, SectionHeader, SkeletonList, ErrorState } from '@components';
+import { ServiceCard, SectionHeader, SkeletonList } from '@components';
 import { Service } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 import { openService } from '@lib/serviceNavigation';
@@ -49,7 +49,7 @@ export default function ServicesScreen() {
     loadCached();
   }, [refresh]);
 
-  if (loading) {
+  if (loading && services.length === 0) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.inner}>
@@ -59,7 +59,6 @@ export default function ServicesScreen() {
       </View>
     );
   }
-  if (error) return <ErrorState message={error} onRetry={refresh} />;
 
   const normalizedSearch = search.toLowerCase();
 
@@ -75,6 +74,10 @@ export default function ServicesScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
       <View style={styles.inner}>
+        {error ? (
+          <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+        ) : null}
+
         <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Ionicons name="search" size={18} color={colors.mutedText} />
           <TextInput
@@ -146,5 +149,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xl,
     fontSize: typography.sizes.base,
+  },
+  errorText: {
+    fontSize: typography.sizes.sm,
+    textAlign: 'center',
+    marginBottom: spacing.md,
   },
 });

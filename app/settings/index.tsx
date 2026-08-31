@@ -91,7 +91,15 @@ export default function SettingsScreen() {
             <Row label="Help Center" icon="headset-outline" onPress={() => router.push('/support' as any)} />
           </Section>
 
-          <GlassButton title="Logout" variant="danger" onPress={signOut} style={styles.logout} />
+          <GlassButton
+            title="Logout"
+            variant="danger"
+            onPress={async () => {
+              await signOut();
+              router.replace('/login');
+            }}
+            style={styles.logout}
+          />
         </GlassCard>
       </View>
     </ScrollView>

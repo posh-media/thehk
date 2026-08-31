@@ -5,7 +5,7 @@ import { KorapayProvider } from '../providers/korapayProvider';
 import { createPayment, processPaymentVerification, ensureWallet } from './walletService';
 import { maybeRewardReferralActivation } from './referralService';
 import { createNotification } from './notificationService';
-import { CURRENCY, MIN_FUNDING_AMOUNT, toKobo, fromKobo } from '../config';
+import { CURRENCY, MIN_FUNDING_AMOUNT, toKobo, PAYSTACK_CALLBACK_URL } from '../config';
 import { Payment } from '../types';
 import { SECRETS } from '../config';
 
@@ -34,7 +34,7 @@ export async function initiateFunding(input: InitiateFundingInput) {
     amount: input.amount,
     provider: input.provider,
     description: `Wallet funding via ${input.provider}`,
-    metadata: { provider: input.provider },
+    metadata: { provider: input.provider, callbackUrl: input.provider === 'paystack' ? PAYSTACK_CALLBACK_URL : undefined },
   });
 
   const provider = getProvider(input.provider);
@@ -93,6 +93,64 @@ export async function handleWebhook(input: HandleWebhookInput) {
     // was chosen). Failures here must never affect the payment/wallet
     // result the user already received, so they're isolated and logged
     // rather than thrown.
+    try {
+      await maybeRewardReferralActivation(userId);
+    } catch (err) {
+      console.error('Referral activation reward failed:', err);
+    }
+  }
+
+  if (result.providerStatus === 'successful') {
+    try {
+      await createNotification({
+        userId,
+        title: 'Wallet Funded',
+        body: `Your wallet was credited with ${(result.amount / CURRENCY.minorUnit).toLocaleString()} HK Coins.`,
+        category: 'transaction',
+        actionUrl: '/wallet',
+      });
+    } catch (err) {
+      console.error('Failed to create wallet funding notification:', err);
+    }
+  }
+
+  return { processed: true, message: 'Payment verified', transactionId: payment.transactionId };
+}
+
+/**
+ * Idempotent Paystack verification from the payment-success redirect page.
+ * The Paystack secret is used only server-side. If our record is already
+ * successful, no credit is applied again.
+ */
+export async function verifyPaystackPayment(reference: string) {
+  const provider = new PaystackProvider(SECRETS.paystack.secretKey);
+  const result = await provider.verifyTransaction(reference, SECRETS.paystack.secretKey);
+
+  const snap = await db.collection('payments').where('reference', '==', result.reference).limit(1).get();
+  if (snap.empty) throw new Error('Payment reference not found');
+
+  const paymentDoc = snap.docs[0];
+  const payment = paymentDoc.data() as Payment;
+
+  if (payment.status === 'successful') {
+    return { processed: true, message: 'Payment already processed', transactionId: payment.transactionId };
+  }
+  if (payment.status === 'failed' || payment.status === 'abandoned') {
+    return { processed: false, message: 'Payment already finalized as non-successful' };
+  }
+
+  if (payment.currency !== result.currency) {
+    throw new Error(`Currency mismatch: expected ${payment.currency}, got ${result.currency}`);
+  }
+
+  const { userId, isFirstFunding } = await processPaymentVerification({
+    payment,
+    providerReference: result.providerReference,
+    providerStatus: result.providerStatus,
+    verifiedAmount: result.amount,
+  });
+
+  if (isFirstFunding) {
     try {
       await maybeRewardReferralActivation(userId);
     } catch (err) {

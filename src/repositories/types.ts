@@ -48,6 +48,7 @@ export interface AuthRepository {
 export interface WalletRepository {
   getWallet(userId: string): Promise<Wallet>;
   fund(userId: string, amount: number, provider: string): Promise<Payment>;
+  verifyPaystackPayment(reference: string): Promise<{ processed: boolean; message: string; transactionId?: string }>;
   withdraw(userId: string, withdrawal: Omit<Withdrawal, 'id' | 'userId' | 'status' | 'reference' | 'createdAt' | 'updatedAt'>): Promise<Withdrawal>;
 }
 
