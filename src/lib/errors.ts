@@ -27,6 +27,12 @@ export function mapCallableError(err: any): Error {
     friendly = 'Bank account verification is not available right now.';
   } else if (message.includes('not found')) {
     friendly = 'The requested record was not found.';
+  } else if (message.includes('a valid amount is required') || message.includes('amount is required')) {
+    friendly = 'Please enter a valid amount for this payment.';
+  } else if (message.includes('insufficient hkc and wallet balance')) {
+    friendly = "You don't have enough HKC or NGN wallet balance to complete this payment. Please fund your wallet.";
+  } else if (message.includes('receipt generation failed') || message.includes('receipt') || message.includes('sender name') || message.includes('receiver')) {
+    friendly = 'Could not generate the receipt. Please check the details and try again.';
   }
 
   const mapped = new Error(friendly);

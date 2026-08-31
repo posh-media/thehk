@@ -67,16 +67,25 @@ export default function OPayReceiptScreen() {
         const selected = banks.find((b) => b.id === bankId && b.implemented && b.receiptTemplate === 'opay') as Bank | null;
         if (!selected) {
           setError('OPay receipt generation is not available for this bank');
+          setLoading(false);
           return;
         }
         setBank(selected);
-        const [wallet, hkc] = await Promise.all([
-          repositories.wallet.getWallet(user?.id || ''),
-          repositories.rewards.getHkcBalance(),
-        ]);
-        setNgnBalance(wallet.balance || 0);
-        setHkcBalance(hkc.balance || 0);
+        try {
+          const [wallet, hkc] = await Promise.all([
+            repositories.wallet.getWallet(user?.id || ''),
+            repositories.rewards.getHkcBalance(),
+          ]);
+          setNgnBalance(wallet.balance || 0);
+          setHkcBalance(hkc.balance || 0);
+        } catch (balanceErr: any) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to load payment balances:', balanceErr);
+          setError('Could not load wallet balances. Please try again.');
+        }
       } catch (err: any) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load OPay bank details:', err);
         setError(err.message || 'Failed to load bank details');
       } finally {
         setLoading(false);
@@ -123,6 +132,8 @@ export default function OPayReceiptScreen() {
       setSessionId(randomNumeric(35));
       setTransactionDate(new Date().toISOString());
     } catch (err: any) {
+      // eslint-disable-next-line no-console
+      console.error('OPay receipt payment failed:', err);
       setError(err.message || 'Payment failed. Please check your balance and try again.');
     } finally {
       setSubmitting(false);
@@ -162,7 +173,7 @@ export default function OPayReceiptScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
       <View style={styles.inner}>
-        <Header title="Generate Receipt" />
+        <Header title={receipt ? 'Share Receipt' : 'Generate Receipt'} />
 
         {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
 
