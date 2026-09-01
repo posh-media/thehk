@@ -39,6 +39,10 @@ export const mockUser: User = {
   },
   role: 'user',
   isVerified: true,
+  isSeller: false,
+  rank: 'Chief',
+  emailVerified: true,
+  phoneVerified: false,
   createdAt: '2023-01-15T10:00:00Z',
   updatedAt: '2024-08-10T08:30:00Z',
 };
@@ -215,6 +219,11 @@ export const mockServices: Service[] = [
   { id: 'svc-hacked-apps', categoryId: 'cat-upcoming', name: 'Hacked Apps', description: 'Modified applications', icon: 'cube', isActive: true, visible: true, implemented: false, sortOrder: 14, route: '/(tabs)/services' },
   { id: 'svc-flash-emails', categoryId: 'cat-upcoming', name: 'Flash Emails', description: 'Temporary email addresses', icon: 'mail', isActive: true, visible: true, implemented: false, sortOrder: 15, route: '/(tabs)/services' },
   { id: 'svc-doc-edit', categoryId: 'cat-upcoming', name: 'Doc Edit', description: 'Document editing services', icon: 'create', isActive: true, visible: true, implemented: false, sortOrder: 16, route: '/(tabs)/services' },
+  { id: 'svc-sub-share', categoryId: 'cat-upcoming', name: 'Sub Share', description: 'Share subscriptions and bundles', icon: 'share-social', isActive: true, visible: true, implemented: false, sortOrder: 17, route: '/(tabs)/services' },
+  { id: 'svc-consignment-video', categoryId: 'cat-upcoming', name: 'Consignment Video', description: 'Consignment video content', icon: 'videocam', isActive: true, visible: true, implemented: false, sortOrder: 18, route: '/(tabs)/services' },
+  { id: 'svc-send-gift', categoryId: 'cat-upcoming', name: 'Send Gift', description: 'Send digital gifts and surprises', icon: 'gift', isActive: true, visible: true, implemented: false, sortOrder: 19, route: '/(tabs)/services' },
+  { id: 'svc-picture-edit', categoryId: 'cat-upcoming', name: 'Picture Edit', description: 'Photo editing and retouching', icon: 'image', isActive: true, visible: true, implemented: false, sortOrder: 20, route: '/(tabs)/services' },
+  { id: 'svc-working-pictures', categoryId: 'cat-upcoming', name: 'Working Pictures', description: 'Professional working documents', icon: 'briefcase', isActive: true, visible: true, implemented: false, sortOrder: 21, route: '/(tabs)/services' },
 ];
 
 export const mockSocialMediaServices: SocialMediaService[] = [

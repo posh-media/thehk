@@ -77,10 +77,8 @@ export default function BankSelectionScreen() {
   if (error) return <ErrorState message={error} onRetry={() => { setRetry((r) => r + 1); setLoading(true); setError(''); }} />;
 
   function handleSelect(bank: Bank) {
-    if (bank.implemented && bank.receiptTemplate === 'opay') {
-      router.push(`/receipts/banks/opay?bankId=${bank.id}` as any);
-      return;
-    }
+    // All banks and wallets currently use the default HK receipt template.
+    // Per-bank templates can be wired here later by checking bank.receiptTemplate.
     router.push(`/receipts/generate?bankId=${bank.id}` as any);
   }
 

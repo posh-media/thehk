@@ -33,9 +33,11 @@ export function ServiceCard({ item, onPress, size = 'md' }: ServiceCardProps) {
         >
           <Ionicons name={icon as any} size={isSmall ? 22 : 28} color={color} />
         </View>
-        <Text style={[styles.name, { color: colors.primaryText }, isSmall && styles.smallName]} numberOfLines={1}>
-          {name}
-        </Text>
+        <View style={styles.nameContainer}>
+          <Text style={[styles.name, { color: colors.primaryText }, isSmall && styles.smallName]}>
+            {name}
+          </Text>
+        </View>
       </GlassCard>
     </TouchableOpacity>
   );
@@ -45,17 +47,21 @@ const styles = StyleSheet.create({
   container: {
     width: '25%',
     padding: spacing.xs,
+    alignSelf: 'stretch',
   },
   smallContainer: {
     width: '20%',
+    alignSelf: 'stretch',
   },
   card: {
+    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     padding: spacing.md,
     minHeight: 88,
   },
   smallCard: {
+    flex: 1,
     padding: spacing.sm,
     minHeight: 72,
   },
@@ -72,6 +78,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
+  },
+  nameContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
   },
   name: {
     fontSize: typography.sizes.xs,

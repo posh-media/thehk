@@ -4,6 +4,7 @@ import { Stack, useRouter, usePathname, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from '@theme/ThemeProvider';
+import { SnackbarProvider } from '@components';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
@@ -128,7 +129,9 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider>
           <QueryClientProvider client={queryClient}>
-            <RootLayoutContent />
+            <SnackbarProvider>
+              <RootLayoutContent />
+            </SnackbarProvider>
           </QueryClientProvider>
         </ThemeProvider>
       </SafeAreaProvider>

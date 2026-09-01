@@ -1,0 +1,18 @@
+Phase 5B: services UI, notifications subcollection, user fields, Bank Gen default template, and payments.
+
+- Services: add Coming Soon toast for unimplemented services, allow service names to wrap, add 5 new upcoming services.
+- Notifications: move client reads/writes and Cloud Functions to users/{uid}/notifications subcollection; update Firestore rules.
+- User system: add isSeller, rank, emailVerified, phoneVerified to User type, mocks, onCreate trigger, and profile sync; add ensureUserDefaults Cloud Function; add email verification flow on Personal Information; show Seller Dashboard / Become a Seller and rank on Me page.
+- Bank Gen: route all banks/wallets through default receipt template; leave existing OPay template unused.
+- Homepage: replace SMM quick action with Refer.
+- Payment success: keep existing idempotent Paystack verification flow intact and verified.
+
+Tests:
+- npx tsc --noEmit passed
+- cd functions && npm run build passed
+- npx expo export --platform web --clear passed
+- npx expo export --platform android --clear passed
+
+Generated with [Devin](https://devin.ai)
+
+Co-Authored-By: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>

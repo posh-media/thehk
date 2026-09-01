@@ -10,7 +10,7 @@ import {
   UserCredential,
 } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
-import { collection, doc, getDoc, getDocs, query, where, orderBy, limit, startAfter, QueryDocumentSnapshot, DocumentSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, orderBy, limit, startAfter, QueryDocumentSnapshot, DocumentSnapshot, updateDoc } from 'firebase/firestore';
 import { auth, db, functions } from '@infrastructure/firebase';
 import { useAuthStore } from '@stores/authStore';
 import {
@@ -136,6 +136,10 @@ function mapFirebaseUser(fu: FirebaseUser | null): User | null {
     },
     role: 'user',
     isVerified: fu.emailVerified,
+    isSeller: false,
+    rank: 'Chief',
+    emailVerified: fu.emailVerified,
+    phoneVerified: false,
     createdAt: fu.metadata.creationTime || new Date().toISOString(),
     updatedAt: fu.metadata.lastSignInTime || new Date().toISOString(),
   };
@@ -148,11 +152,17 @@ async function fetchUserProfile(uid: string): Promise<Partial<User>> {
 }
 
 async function syncUserProfile(fu: FirebaseUser): Promise<User> {
+  const ensure = getCallable<void, User>('ensureUserDefaults');
   let profile: Partial<User> = {};
   try {
-    profile = await fetchUserProfile(fu.uid);
+    const { data } = await ensure();
+    profile = data;
   } catch {
-    // allow fallback to local mapping
+    try {
+      profile = await fetchUserProfile(fu.uid);
+    } catch {
+      // allow fallback to local mapping
+    }
   }
   const base = mapFirebaseUser(fu)!;
   return { ...base, ...profile };
@@ -228,8 +238,8 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   async updateProfile(_userId: string, data: Partial<User>): Promise<User> {
-    const fn = getCallable<Partial<User>, void>('updateUserProfile');
-    await fn({ ...data });
+    const fn = getCallable<Partial<User>, User>('updateUserProfile');
+    const result = await fn({ ...data });
     const authUser = auth.currentUser;
     if (authUser && (data.displayName !== undefined || data.photoUrl !== undefined)) {
       await updateFirebaseProfile(authUser, {
@@ -240,7 +250,7 @@ class FirebaseAuthRepository implements AuthRepository {
     if (!this.currentUser) {
       throw new Error('No current user');
     }
-    this.currentUser = { ...this.currentUser, ...data, updatedAt: new Date().toISOString() };
+    this.currentUser = { ...this.currentUser, ...result, ...data, updatedAt: new Date().toISOString() };
     return this.currentUser;
   }
 
@@ -259,15 +269,15 @@ class FirebaseAuthRepository implements AuthRepository {
     await sendEmailVerification(u);
   }
 
-  async verifyEmail(): Promise<boolean> {
+  async verifyEmail(): Promise<User> {
     const u = auth.currentUser;
-    if (!u) return false;
+    if (!u) throw new Error('No authenticated user');
     await u.reload();
     const verified = u.emailVerified;
-    if (verified && this.currentUser) {
-      this.currentUser = { ...this.currentUser, isVerified: true };
-    }
-    return verified;
+    if (!verified) throw new Error('Email not verified yet. Please check your inbox and click the verification link.');
+    const updated = await this.updateProfile(u.uid, { emailVerified: true, isVerified: true });
+    this.currentUser = updated;
+    return updated;
   }
 
   getCurrentUser(): User | null {
@@ -333,20 +343,28 @@ class FirebaseTransactionRepository implements TransactionRepository {
 
 class FirebaseNotificationRepository implements NotificationRepository {
   async getNotifications(userId: string): Promise<Notification[]> {
-    const fn = getCallable<{ limit?: number }, Notification[]>('getNotifications');
-    const { data } = await fn({ limit: 50 });
-    return data;
+    const q = query(
+      collection(db, 'users', userId, 'notifications'),
+      orderBy('createdAt', 'desc'),
+      limit(50)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Notification));
   }
 
   async markAsRead(id: string): Promise<void> {
-    const fn = getCallable<{ id: string }, void>('markNotificationRead');
-    await fn({ id });
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error('Not authenticated');
+    await updateDoc(doc(db, 'users', uid, 'notifications', id), { isRead: true, updatedAt: new Date().toISOString() });
   }
 
   async markAllAsRead(userId: string): Promise<void> {
-    // Mark all as read individually for now
-    const notes = await this.getNotifications(userId);
-    await Promise.all(notes.filter((n) => !n.isRead).map((n) => this.markAsRead(n.id)));
+    const q = query(
+      collection(db, 'users', userId, 'notifications'),
+      where('isRead', '==', false)
+    );
+    const snap = await getDocs(q);
+    await Promise.all(snap.docs.map((d) => updateDoc(d.ref, { isRead: true, updatedAt: new Date().toISOString() })));
   }
 }
 
@@ -671,9 +689,9 @@ class FirebaseSupportRepository implements SupportRepository {
 // Account-name verification is real, via Paystack's "Resolve Account Number" endpoint
 // (functions/src/services/bankService.ts) - the same provider/secret already used for wallet funding.
 const walletEntries: Bank[] = [
-  { id: 'wallet-coinbase', name: 'Coinbase', code: 'COINBASE', category: 'wallet', implemented: false, receiptTemplate: 'generic', logoAsset: walletLogoAssets.coinbase },
-  { id: 'wallet-paypal', name: 'PayPal', code: 'PAYPAL', category: 'wallet', implemented: false, receiptTemplate: 'generic', logoAsset: walletLogoAssets.paypal },
-  { id: 'wallet-binance', name: 'Binance', code: 'BINANCE', category: 'wallet', implemented: false, receiptTemplate: 'generic', logoAsset: walletLogoAssets.binance },
+  { id: 'wallet-coinbase', name: 'Coinbase', code: 'COINBASE', category: 'wallet', implemented: true, receiptTemplate: 'default', logoAsset: walletLogoAssets.coinbase },
+  { id: 'wallet-paypal', name: 'PayPal', code: 'PAYPAL', category: 'wallet', implemented: true, receiptTemplate: 'default', logoAsset: walletLogoAssets.paypal },
+  { id: 'wallet-binance', name: 'Binance', code: 'BINANCE', category: 'wallet', implemented: true, receiptTemplate: 'default', logoAsset: walletLogoAssets.binance },
 ];
 
 class FirebaseBankRepository implements BankRepository {
@@ -681,6 +699,7 @@ class FirebaseBankRepository implements BankRepository {
     const banks = (paystackBanks.banks || []).map((b) => ({
       ...b,
       logoAsset: b.slug ? bankLogoAssets[b.slug] : undefined,
+      receiptTemplate: b.receiptTemplate || 'default',
     })) as Bank[];
     return [...banks, ...walletEntries];
   }

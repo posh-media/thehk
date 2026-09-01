@@ -21,6 +21,7 @@ import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
 import { GlassCard, GlassInput, GlassSelect, GlassButton, Header } from '@components';
 import { useAuthStore } from '@stores/authStore';
+import { showToast } from '@lib/toast';
 import { storage } from '@infrastructure/firebase';
 import { repositories } from '@repositories/mockRepository';
 import { formatPhoneNumber } from '@lib/formatters';
@@ -34,6 +35,23 @@ const countries = [
   'United Kingdom',
   'Canada',
 ];
+
+function VerificationRow({ label, verified, onVerify }: { label: string; verified: boolean; onVerify: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.verificationRow}>
+      <View style={styles.verificationInfo}>
+        <Ionicons name={verified ? 'checkmark-circle' : 'alert-circle-outline'} size={20} color={verified ? colors.success : colors.mutedText} />
+        <Text style={[styles.verificationLabel, { color: colors.primaryText }]}>{label}</Text>
+      </View>
+      <TouchableOpacity activeOpacity={0.8} onPress={verified ? undefined : onVerify} disabled={verified}>
+        <Text style={[styles.verificationAction, { color: verified ? colors.success : colors.primary }]}>
+          {verified ? 'Verified' : `Verify ${label}`}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 function parseDate(value: string): Date {
   const d = value ? new Date(value) : new Date();
@@ -205,6 +223,36 @@ export default function PersonalInfoScreen() {
             </View>
           </TouchableOpacity>
 
+          <View style={styles.verificationSection}>
+            <VerificationRow
+              label="Email"
+              verified={!!user?.emailVerified}
+              onVerify={async () => {
+                if (user?.emailVerified) return;
+                try {
+                  await repositories.auth.resendVerification();
+                  showToast('Verification email sent');
+                } catch (err: any) {
+                  Alert.alert('Email verification', err.message || 'Could not send verification email.');
+                  return;
+                }
+                // Attempt to sync the verified state (no-op if not verified yet).
+                try {
+                  const updated = await repositories.auth.verifyEmail();
+                  setUser(updated);
+                  showToast('Email verified');
+                } catch {
+                  // Not verified yet; user must click the email link first.
+                }
+              }}
+            />
+            <VerificationRow
+              label="Phone"
+              verified={!!user?.phoneVerified}
+              onVerify={() => showToast('Phone verification coming soon')}
+            />
+          </View>
+
           {success && (
             <View style={[styles.success, { backgroundColor: colors.successSurface }]}>
               <Ionicons name="checkmark-circle" size={18} color={colors.success} />
@@ -329,6 +377,29 @@ const styles = StyleSheet.create({
   },
   successText: {
     fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold as any,
+  },
+  verificationSection: {
+    marginTop: spacing.md,
+    gap: spacing.md,
+  },
+  verificationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+  },
+  verificationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  verificationLabel: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.medium as any,
+  },
+  verificationAction: {
+    fontSize: typography.sizes.sm,
     fontWeight: typography.weights.semibold as any,
   },
   modalOverlay: {

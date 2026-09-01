@@ -20,7 +20,7 @@ export async function createNotification(input: {
   category: NotificationCategory;
   actionUrl?: string;
 }): Promise<AppNotification> {
-  const id = db.collection('notifications').doc().id;
+  const id = db.collection('users').doc(input.userId).collection('notifications').doc().id;
   const notification: AppNotification = {
     id,
     userId: input.userId,
@@ -31,6 +31,6 @@ export async function createNotification(input: {
     actionUrl: input.actionUrl,
     createdAt: new Date().toISOString(),
   };
-  await db.collection('notifications').doc(id).set(notification);
+  await db.collection('users').doc(input.userId).collection('notifications').doc(id).set(notification);
   return notification;
 }

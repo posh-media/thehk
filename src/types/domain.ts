@@ -38,6 +38,10 @@ export interface User {
   preferences: UserPreferences;
   role: 'user' | 'seller' | 'admin' | 'support';
   isVerified: boolean;
+  isSeller: boolean;
+  rank: string;
+  emailVerified: boolean;
+  phoneVerified: boolean;
   createdAt: string;
   updatedAt: string;
 }

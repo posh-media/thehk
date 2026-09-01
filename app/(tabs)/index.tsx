@@ -166,11 +166,11 @@ export default function HomeScreen() {
                   </View>
                   <Text style={[styles.actionLabel, { color: colors.primaryText }]}>History</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.action} onPress={() => router.push('/services/smm')}>
+                <TouchableOpacity style={styles.action} onPress={() => router.push('/rewards/referrals')}>
                   <View style={[styles.actionIcon, { backgroundColor: colors.surface }]}>
                     <Ionicons name="people" size={20} color={colors.primary} />
                   </View>
-                  <Text style={[styles.actionLabel, { color: colors.primaryText }]}>SMM</Text>
+                  <Text style={[styles.actionLabel, { color: colors.primaryText }]}>Refer</Text>
                 </TouchableOpacity>
               </View>
             </>

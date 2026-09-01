@@ -41,7 +41,7 @@ export interface AuthRepository {
   signOut(): Promise<void>;
   resetPassword(email: string): Promise<void>;
   resendVerification(): Promise<void>;
-  verifyEmail(): Promise<boolean>;
+  verifyEmail(): Promise<User>;
   getCurrentUser(): User | null;
 }
 

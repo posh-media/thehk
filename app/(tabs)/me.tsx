@@ -7,6 +7,7 @@ import { spacing, typography, borderRadius } from '@theme/tokens';
 import { GlassCard, GlassButton } from '@components';
 import { useAuthStore } from '@stores/authStore';
 import { useTheme as useThemeContext } from '@theme/ThemeProvider';
+import { showToast } from '@lib/toast';
 
 const menuItems = [
   { label: 'Personal Information', icon: 'person-outline', route: '/profile/personal-info' },
@@ -23,6 +24,9 @@ export default function ProfileScreen() {
   const { user, signOut } = useAuthStore();
   const { toggle, resolvedMode } = useThemeContext();
 
+  const sellerLabel = user?.isSeller ? 'Seller Dashboard' : 'Become a Seller';
+  const rank = user?.rank || 'Chief';
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
       <View style={styles.inner}>
@@ -37,6 +41,7 @@ export default function ProfileScreen() {
             )}
             <View style={styles.profileInfo}>
               <Text style={[styles.name, { color: colors.primaryText }]}>{user?.displayName || 'User'}</Text>
+              <Text style={[styles.rank, { color: colors.secondaryText }]}>{rank}</Text>
               <Text style={[styles.email, { color: colors.secondaryText }]}>{user?.email}</Text>
             </View>
           </View>
@@ -44,6 +49,18 @@ export default function ProfileScreen() {
             <Ionicons name={resolvedMode === 'dark' ? 'sunny-outline' : 'moon-outline'} size={20} color={colors.primaryText} />
           </TouchableOpacity>
         </View>
+
+        <GlassCard style={styles.sellerCard} blur>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => showToast('Coming soon')}
+            style={styles.sellerRow}
+          >
+            <Ionicons name={user?.isSeller ? 'storefront' : 'person-add'} size={22} color={colors.primary} />
+            <Text style={[styles.sellerLabel, { color: colors.primaryText }]}>{sellerLabel}</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+          </TouchableOpacity>
+        </GlassCard>
 
         <GlassCard style={styles.menuCard}>
           {menuItems.map((item, index) => (
@@ -102,6 +119,11 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold as any,
     marginBottom: spacing.xs,
   },
+  rank: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.medium as any,
+    marginBottom: spacing.xs,
+  },
   email: {
     fontSize: typography.sizes.sm,
   },
@@ -111,6 +133,20 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sellerCard: {
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  sellerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  sellerLabel: {
+    flex: 1,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.medium as any,
   },
   menuCard: {
     padding: 0,

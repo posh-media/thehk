@@ -19,3 +19,4 @@ export { Sidebar } from './Sidebar';
 export { BottomNav } from './BottomNav';
 export { ResponsiveContainer } from './ResponsiveContainer';
 export { SkeletonText, SkeletonTitle, SkeletonCircle, SkeletonCard, SkeletonItem, SkeletonList } from './Skeleton';
+export { SnackbarProvider } from './SnackbarProvider';

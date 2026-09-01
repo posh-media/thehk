@@ -85,6 +85,10 @@ export const onUserCreated = functions
       },
       role: 'user',
       isVerified: user.emailVerified,
+      isSeller: false,
+      rank: 'Chief',
+      emailVerified: user.emailVerified,
+      phoneVerified: false,
       referralCode,
       referredBy: null,
       createdAt: now,
@@ -219,7 +223,35 @@ export const updateUserProfile = functions
     if (data.dateOfBirth !== undefined) update.dateOfBirth = data.dateOfBirth;
     if (data.photoUrl !== undefined) update.photoUrl = data.photoUrl;
     if (data.preferences !== undefined) update.preferences = data.preferences;
+    if (data.isVerified !== undefined) update.isVerified = data.isVerified;
+    if (data.isSeller !== undefined) update.isSeller = data.isSeller;
+    if (data.rank !== undefined) update.rank = data.rank;
+    if (data.emailVerified !== undefined) update.emailVerified = data.emailVerified;
+    if (data.phoneVerified !== undefined) update.phoneVerified = data.phoneVerified;
     await db.collection('users').doc(uid).update(update);
+    const snap = await db.collection('users').doc(uid).get();
+    return snap.data();
+  });
+
+export const ensureUserDefaults = functions
+  .region(REGION)
+  .runWith(RUNTIME_OPTS)
+  .https.onCall(async (_data, context) => {
+    const uid = requireAuth(context);
+    const user = context.auth?.token;
+    const ref = db.collection('users').doc(uid);
+    const snap = await ref.get();
+    if (!snap.exists) throw new functions.https.HttpsError('not-found', 'User not found');
+    const data = snap.data() as Record<string, any>;
+    const now = new Date().toISOString();
+    const update: Record<string, any> = { updatedAt: now };
+    if (data.isSeller === undefined) update.isSeller = false;
+    if (data.rank === undefined) update.rank = 'Chief';
+    if (data.emailVerified === undefined) update.emailVerified = user?.email_verified ?? false;
+    if (data.phoneVerified === undefined) update.phoneVerified = false;
+    if (Object.keys(update).length > 1) await ref.update(update);
+    const fresh = await ref.get();
+    return fresh.data();
   });
 
 export const getUserProfile = functions
@@ -357,8 +389,7 @@ export const getNotifications = functions
   .https.onCall(async (data, context) => {
     const uid = requireAuth(context);
     const limit = Math.min(Number(data.limit) || 50, 200);
-    const snap = await db.collection('notifications')
-      .where('userId', '==', uid)
+    const snap = await db.collection('users').doc(uid).collection('notifications')
       .orderBy('createdAt', 'desc')
       .limit(limit)
       .get();
@@ -371,7 +402,7 @@ export const markNotificationRead = functions
   .https.onCall(async (data, context) => {
     const uid = requireAuth(context);
     if (!data.id) throw new functions.https.HttpsError('invalid-argument', 'Notification id is required.');
-    await db.collection('notifications').doc(data.id).update({ isRead: true, updatedAt: new Date().toISOString() });
+    await db.collection('users').doc(uid).collection('notifications').doc(data.id).update({ isRead: true, updatedAt: new Date().toISOString() });
   });
 
 // --- Phase 3: Social media services (The Owlet) ---
