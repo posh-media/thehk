@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Modal, Image, Alert } from 'react-native';
+import { View, Text, TextInput, ScrollView, StyleSheet, TouchableOpacity, Modal, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
@@ -30,6 +30,7 @@ export default function GenerateReceiptScreen() {
   const initialBankId = (params.bankId as string) || undefined;
 
   const [banks, setBanks] = useState<Bank[]>([]);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [generating, setGenerating] = useState(false);
@@ -65,8 +66,15 @@ export default function GenerateReceiptScreen() {
       implemented: false,
       receiptTemplate: 'generic',
     };
-    return [...banks, others];
+    return [...banks].sort((a, b) => a.name.localeCompare(b.name)).concat(others);
   }, [banks]);
+
+  const displayBanks = useMemo<Bank[]>(() => {
+    const q = search.toLowerCase().trim();
+    return q
+      ? allBanks.filter((b) => b.id === OTHERS_BANK_ID || b.name.toLowerCase().includes(q))
+      : allBanks;
+  }, [allBanks, search]);
 
   const senderAccountLabel = useMemo(() => {
     if (!receiverBank || receiverBank.id === OTHERS_BANK_ID) return 'Sender Account Number (optional)';
@@ -100,7 +108,8 @@ export default function GenerateReceiptScreen() {
     async function load() {
       try {
         const data = await repositories.bank.getBanks();
-        setBanks(data);
+        // Receiver bank list should only show Paystack-supported banks (not wallets).
+        setBanks(data.filter((b) => b.category === 'bank'));
       } catch (err: any) {
         setError(err.message || 'Failed to load banks');
       } finally {
@@ -321,12 +330,23 @@ export default function GenerateReceiptScreen() {
         />
       </View>
 
-      <Modal visible={bankPickerVisible} animationType="slide" onRequestClose={() => setBankPickerVisible(false)}>
+      <Modal visible={bankPickerVisible} animationType="slide" onRequestClose={() => { setBankPickerVisible(false); setSearch(''); }}>
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <Header title="Select Bank" onBack={() => setBankPickerVisible(false)} />
+          <Header title="Select Bank" onBack={() => { setBankPickerVisible(false); setSearch(''); }} />
+          <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Ionicons name="search" size={18} color={colors.mutedText} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.primaryText }]}
+              placeholder="Search bank..."
+              placeholderTextColor={colors.mutedText}
+              value={search}
+              onChangeText={setSearch}
+              autoFocus
+            />
+          </View>
           <ScrollView style={styles.inner}>
-            {allBanks.map((bank) => (
-              <TouchableOpacity key={bank.id} activeOpacity={0.8} onPress={() => { setReceiverBank(bank); setBankPickerVisible(false); }}>
+            {displayBanks.map((bank) => (
+              <TouchableOpacity key={bank.id} activeOpacity={0.8} onPress={() => { setReceiverBank(bank); setBankPickerVisible(false); setSearch(''); }}>
                 <GlassCard style={styles.bankCard}>
                   <View style={styles.bankRow}>
                     {bank.logoAsset || bank.logoUrl ? (
@@ -411,4 +431,20 @@ const styles = StyleSheet.create({
   bankInfo: { flex: 1, marginLeft: spacing.md },
   bankName: { fontSize: typography.sizes.base, fontWeight: typography.weights.semibold as any, marginBottom: spacing.xs },
   bankCode: { fontSize: typography.sizes.sm },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    fontSize: typography.sizes.base,
+  },
 });

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, FlatList, StyleSheet } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Modal, FlatList, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/useTheme';
 import { borderRadius, spacing, typography } from '@theme/tokens';
@@ -18,12 +18,21 @@ interface GlassSelectProps {
   onSelect: (value: string) => void;
   leftIcon?: string;
   error?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 }
 
-export function GlassSelect({ label, options, value, placeholder = 'Select', onSelect, leftIcon, error }: GlassSelectProps) {
+export function GlassSelect({ label, options, value, placeholder = 'Select', onSelect, leftIcon, error, searchable, searchPlaceholder = 'Search...' }: GlassSelectProps) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const selected = options.find((o) => o.value === value);
+
+  const filtered = useMemo(() => {
+    if (!searchable || !query.trim()) return options;
+    const q = query.toLowerCase();
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, query, searchable]);
 
   return (
     <View>
@@ -44,20 +53,35 @@ export function GlassSelect({ label, options, value, placeholder = 'Select', onS
       </TouchableOpacity>
       {error && <Text style={[styles.error, { color: colors.error }]}>{error}</Text>}
 
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="slide" onRequestClose={() => { setOpen(false); setQuery(''); }}>
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
-          <TouchableOpacity style={styles.dismissArea} onPress={() => setOpen(false)} />
+          <TouchableOpacity style={styles.dismissArea} onPress={() => { setOpen(false); setQuery(''); }} />
           <GlassCard blur={false} elevated style={styles.modalContent}>
             <Text style={[styles.modalTitle, { color: colors.primaryText }]}>Select</Text>
+            {searchable && (
+              <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Ionicons name="search" size={18} color={colors.mutedText} />
+                <TextInput
+                  style={[styles.searchInput, { color: colors.primaryText }]}
+                  placeholder={searchPlaceholder}
+                  placeholderTextColor={colors.mutedText}
+                  value={query}
+                  onChangeText={setQuery}
+                  autoFocus
+                />
+              </View>
+            )}
             <FlatList
-              data={options}
+              data={filtered}
               keyExtractor={(item) => item.value}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.option}
                   onPress={() => {
                     onSelect(item.value);
                     setOpen(false);
+                    setQuery('');
                   }}
                 >
                   <Text style={[styles.optionText, { color: colors.primaryText }]}>{item.label}</Text>
@@ -122,6 +146,20 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   optionText: {
+    fontSize: typography.sizes.base,
+  },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
     fontSize: typography.sizes.base,
   },
 });

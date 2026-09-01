@@ -31,6 +31,7 @@ import {
   ReceiptRepository,
 } from './types';
 import {
+  Bank,
   User,
   Wallet,
   Transaction,
@@ -70,8 +71,9 @@ import {
   mockRewards,
   mockSupportTickets,
   mockTutorials,
-  mockBanks,
 } from '@/data/mocks';
+import paystackBanks from '@/data/paystackBanks.json';
+import { bankLogoAssets, walletLogoAssets } from '@/data/bankLogos';
 import { toMinorUnits } from '@lib/formatters';
 import { mapCallableError } from '@lib/errors';
 
@@ -664,12 +666,24 @@ class FirebaseSupportRepository implements SupportRepository {
   }
 }
 
-// Bank list stays local (a small, stable set of Nigerian banks with
-// logos); account-name verification is real, via Paystack's "Resolve
-// Account Number" endpoint (functions/src/services/bankService.ts) - the
-// same provider/secret already used for wallet funding.
+// Bank list is loaded from a one-time Paystack snapshot (src/data/paystackBanks.json).
+// Logos are attached locally for the banks we have assets for; the rest show initials.
+// Account-name verification is real, via Paystack's "Resolve Account Number" endpoint
+// (functions/src/services/bankService.ts) - the same provider/secret already used for wallet funding.
+const walletEntries: Bank[] = [
+  { id: 'wallet-coinbase', name: 'Coinbase', code: 'COINBASE', category: 'wallet', implemented: false, receiptTemplate: 'generic', logoAsset: walletLogoAssets.coinbase },
+  { id: 'wallet-paypal', name: 'PayPal', code: 'PAYPAL', category: 'wallet', implemented: false, receiptTemplate: 'generic', logoAsset: walletLogoAssets.paypal },
+  { id: 'wallet-binance', name: 'Binance', code: 'BINANCE', category: 'wallet', implemented: false, receiptTemplate: 'generic', logoAsset: walletLogoAssets.binance },
+];
+
 class FirebaseBankRepository implements BankRepository {
-  async getBanks(): Promise<any[]> { return mockBanks; }
+  async getBanks(): Promise<Bank[]> {
+    const banks = (paystackBanks.banks || []).map((b) => ({
+      ...b,
+      logoAsset: b.slug ? bankLogoAssets[b.slug] : undefined,
+    })) as Bank[];
+    return [...banks, ...walletEntries];
+  }
 
   async verifyAccount(bankCode: string, accountNumber: string): Promise<{ accountName: string }> {
     const fn = getCallable<{ bankCode: string; accountNumber: string }, { accountName: string }>('verifyBankAccount');

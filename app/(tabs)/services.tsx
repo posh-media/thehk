@@ -49,17 +49,6 @@ export default function ServicesScreen() {
     loadCached();
   }, [refresh]);
 
-  if (loading && services.length === 0) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.inner}>
-          <Text style={[styles.title, { color: colors.primaryText }]}>All Services</Text>
-          <SkeletonList count={5} />
-        </View>
-      </View>
-    );
-  }
-
   const normalizedSearch = search.toLowerCase();
 
   const popular = useMemo(
@@ -70,6 +59,17 @@ export default function ServicesScreen() {
     () => services.filter((s) => s.name.toLowerCase().includes(normalizedSearch)).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)),
     [services, normalizedSearch]
   );
+
+  if (loading && services.length === 0) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.inner}>
+          <Text style={[styles.title, { color: colors.primaryText }]}>All Services</Text>
+          <SkeletonList count={5} />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>

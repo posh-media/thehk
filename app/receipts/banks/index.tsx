@@ -7,12 +7,23 @@ import { GlassCard, Header, LoadingState, ErrorState } from '@components';
 import { Bank } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 
-const BANK_ORDER = ['OPay', 'Kuda', 'United Bank for Africa', 'Access Bank', 'Guaranty Trust Bank', 'First Bank of Nigeria', 'Zenith Bank', 'Fidelity Bank', 'Union Bank', 'PalmPay'];
+const ORDERED_SLUGS = [
+  'opay',
+  'kuda-bank',
+  'united-bank-for-africa',
+  'access-bank',
+  'guaranty-trust-bank',
+  'first-bank-of-nigeria',
+  'zenith-bank',
+  'fidelity-bank',
+  'union-bank-of-nigeria',
+  'palmpay',
+];
 
-function sortBanks(banks: Bank[]) {
-  return banks.sort((a, b) => {
-    const ai = BANK_ORDER.indexOf(a.name);
-    const bi = BANK_ORDER.indexOf(b.name);
+function sortFeatured(banks: Bank[]) {
+  return [...banks].sort((a, b) => {
+    const ai = ORDERED_SLUGS.indexOf(a.slug || '');
+    const bi = ORDERED_SLUGS.indexOf(b.slug || '');
     if (ai !== -1 && bi !== -1) return ai - bi;
     if (ai !== -1) return -1;
     if (bi !== -1) return 1;
@@ -20,11 +31,26 @@ function sortBanks(banks: Bank[]) {
   });
 }
 
+function BankLogo({ bank }: { bank: Bank }) {
+  const { colors } = useTheme();
+  if (bank.logoAsset) {
+    return <Image source={bank.logoAsset} style={styles.logo} resizeMode="contain" accessibilityLabel={bank.name} />;
+  }
+  if (bank.logoUrl) {
+    return <Image source={{ uri: bank.logoUrl }} style={styles.logo} resizeMode="contain" accessibilityLabel={bank.name} />;
+  }
+  return (
+    <View style={[styles.initials, { backgroundColor: `${colors.primary}20` }]}>
+      <Text style={[styles.initialText, { color: colors.primary }]}>{bank.name.charAt(0)}</Text>
+    </View>
+  );
+}
+
 export default function BankSelectionScreen() {
   const { colors } = useTheme();
   const router = useRouter();
 
-  const [banks, setBanks] = useState<Bank[]>([]);
+  const [featuredBanks, setFeaturedBanks] = useState<Bank[]>([]);
   const [wallets, setWallets] = useState<Bank[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -35,9 +61,9 @@ export default function BankSelectionScreen() {
       try {
         const data = await repositories.bank.getBanks();
         const bankItems = data.filter((b) => b.category === 'bank');
-        const walletItems = data.filter((b) => b.category === 'wallet');
-        setBanks(sortBanks(bankItems));
-        setWallets(walletItems);
+        const featured = bankItems.filter((b) => ORDERED_SLUGS.includes(b.slug || ''));
+        setFeaturedBanks(sortFeatured(featured));
+        setWallets(data.filter((b) => b.category === 'wallet'));
       } catch (err: any) {
         setError(err.message || 'Failed to load banks');
       } finally {
@@ -65,14 +91,9 @@ export default function BankSelectionScreen() {
           <TouchableOpacity key={bank.id} activeOpacity={0.8} onPress={() => handleSelect(bank)} style={styles.bankWrapper}>
             <GlassCard style={styles.card}>
               <View style={styles.logoBox}>
-                <Image
-                  source={bank.logoAsset ? bank.logoAsset : { uri: bank.logoUrl }}
-                  style={styles.logo}
-                  resizeMode="contain"
-                  accessibilityLabel={bank.name}
-                />
+                <BankLogo bank={bank} />
               </View>
-              <Text style={[styles.name, { color: colors.primaryText }]} numberOfLines={1}>
+              <Text style={[styles.name, { color: colors.primaryText }]} numberOfLines={2}>
                 {bank.name}
               </Text>
             </GlassCard>
@@ -88,7 +109,7 @@ export default function BankSelectionScreen() {
         <Header title="Select Institution" subtitle="Choose a bank or wallet to generate a receipt for" />
 
         <Text style={[styles.sectionTitle, { color: colors.primaryText }]}>Banks</Text>
-        {renderGrid(banks)}
+        {renderGrid(featuredBanks)}
 
         <Text style={[styles.sectionTitle, { color: colors.primaryText }]}>Wallets</Text>
         {renderGrid(wallets)}
@@ -133,6 +154,17 @@ const styles = StyleSheet.create({
   logo: {
     width: '100%',
     height: '100%',
+  },
+  initials: {
+    width: 72,
+    height: 72,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initialText: {
+    fontSize: typography.sizes.xxl,
+    fontWeight: typography.weights.bold as any,
   },
   name: {
     fontSize: typography.sizes.xs,

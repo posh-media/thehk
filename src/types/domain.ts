@@ -128,6 +128,13 @@ export interface Bank {
   id: string;
   name: string;
   code: string;
+  // Paystack fields (kept for future provider flexibility).
+  slug?: string;
+  longcode?: string;
+  type?: string;
+  country?: string;
+  currency?: string;
+  active?: boolean;
   logoUrl?: string;
   // Local asset module (e.g. require('./assets/...')) for bank logos that
   // ship with the app. Takes precedence over logoUrl when present.
