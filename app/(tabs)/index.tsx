@@ -11,7 +11,7 @@ import { useAuthStore } from '@stores/authStore';
 import { repositories } from '@repositories/mockRepository';
 import { db } from '@infrastructure/firebase';
 import { Wallet, Transaction, Service } from '@/types/domain';
-import { formatCurrency, formatHkc } from '@lib/formatters';
+import { formatCurrency } from '@lib/formatters';
 import { openService } from '@lib/serviceNavigation';
 
 export default function HomeScreen() {
@@ -138,9 +138,14 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-              <Text style={[styles.balance, { color: colors.primaryText }]}>
-                {hideBalance ? '****' : formatHkc(wallet?.hkcBalance || 0)}
-              </Text>
+              <View style={styles.balanceRow}>
+                <Text style={[styles.balance, { color: colors.primaryText }]}>
+                  {hideBalance ? '****' : Math.round(wallet?.hkcBalance || 0).toLocaleString('en-NG')}
+                </Text>
+                {!hideBalance && (
+                  <Text style={[styles.hkcUnit, { color: colors.secondaryText }]}>HKC</Text>
+                )}
+              </View>
               <View style={[styles.ngnRow, { borderTopColor: colors.divider }]}>
                 <Text style={[styles.ngnLabel, { color: colors.secondaryText }]}>NGN Wallet</Text>
                 <Text style={[styles.ngnValue, { color: colors.primaryText }]}>
@@ -265,7 +270,16 @@ const styles = StyleSheet.create({
   balance: {
     fontSize: 36,
     fontWeight: typography.weights.bold as any,
+  },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.xs,
     marginBottom: spacing.md,
+  },
+  hkcUnit: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.medium as any,
   },
   balanceActions: {
     flexDirection: 'row',

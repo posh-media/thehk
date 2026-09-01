@@ -50,6 +50,9 @@ export default function GenerateReceiptScreen() {
   const [customBankName, setCustomBankName] = useState('');
   const [receiverAccount, setReceiverAccount] = useState('');
   const [receiverName, setReceiverName] = useState('');
+  const [walletEmail, setWalletEmail] = useState('');
+  const [walletCrypto, setWalletCrypto] = useState('');
+  const [walletNetwork, setWalletNetwork] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState('');
 
@@ -76,10 +79,40 @@ export default function GenerateReceiptScreen() {
       : allBanks;
   }, [allBanks, search]);
 
+  const isOthers = receiverBank?.id === OTHERS_BANK_ID;
+  const isWallet = receiverBank?.category === 'wallet';
+
   const senderAccountLabel = useMemo(() => {
-    if (!receiverBank || receiverBank.id === OTHERS_BANK_ID) return 'Sender Account Number (optional)';
-    return `Sender ${receiverBank.name} Account Number (optional)`;
-  }, [receiverBank]);
+    if (!receiverBank) return 'Sender Account Number';
+    if (isOthers) return 'Sender Account Number';
+    if (isWallet) {
+      if (receiverBank.id === 'wallet-paypal') return `Sender ${receiverBank.name} Email`;
+      return `Sender ${receiverBank.name} Wallet Address`;
+    }
+    return `Sender ${receiverBank.name} Account Number`;
+  }, [receiverBank, isOthers, isWallet]);
+
+  const senderAccountPlaceholder = useMemo(() => {
+    if (isWallet && receiverBank?.id === 'wallet-paypal') return 'Sender PayPal email';
+    if (isWallet) return 'Sender wallet address';
+    return 'Sender account number';
+  }, [receiverBank, isWallet]);
+
+  const receiverAccountLabel = useMemo(() => {
+    if (!receiverBank) return 'Receiver Account Number';
+    if (isOthers) return 'Receiver Account Number';
+    if (isWallet) {
+      if (receiverBank.id === 'wallet-paypal') return `Receiver ${receiverBank.name} Email`;
+      return `Receiver ${receiverBank.name} Wallet Address`;
+    }
+    return 'Receiver Account Number';
+  }, [receiverBank, isOthers, isWallet]);
+
+  const receiverAccountPlaceholder = useMemo(() => {
+    if (isWallet && receiverBank?.id === 'wallet-paypal') return 'receiver@paypal.com';
+    if (isWallet) return 'Wallet address';
+    return '10 digit account number';
+  }, [receiverBank, isWallet]);
 
   useEffect(() => {
     if (prefilledAmount) setAmount(prefilledAmount);
@@ -108,8 +141,8 @@ export default function GenerateReceiptScreen() {
     async function load() {
       try {
         const data = await repositories.bank.getBanks();
-        // Receiver bank list should only show Paystack-supported banks (not wallets).
-        setBanks(data.filter((b) => b.category === 'bank'));
+        // Load all banks and wallets; the form adapts based on selection.
+        setBanks(data);
       } catch (err: any) {
         setError(err.message || 'Failed to load banks');
       } finally {
@@ -126,7 +159,7 @@ export default function GenerateReceiptScreen() {
   }, [initialBankId, allBanks]);
 
   useEffect(() => {
-    if (!receiverBank || receiverBank.id === OTHERS_BANK_ID) return;
+    if (!receiverBank || receiverBank.id === OTHERS_BANK_ID || receiverBank.category === 'wallet') return;
     if (receiverAccount.length !== 10) return;
     let cancelled = false;
     async function verify() {
@@ -147,12 +180,20 @@ export default function GenerateReceiptScreen() {
   }, [receiverBank, receiverAccount]);
 
   async function handleGenerate() {
-    if (!amount || !senderName || !receiverBank || !receiverAccount || !receiverName) {
+    if (!amount || Number(amount) <= 0 || !senderName || !senderAccount || !receiverBank || !receiverAccount || !receiverName) {
       setError('Please fill in all required fields');
       return;
     }
     if (receiverBank.id === OTHERS_BANK_ID && !customBankName.trim()) {
       setError('Please enter the custom bank name');
+      return;
+    }
+    if (!isWallet && !isOthers && receiverAccount.length !== 10) {
+      setError('Please enter a valid 10-digit receiver account number');
+      return;
+    }
+    if (isWallet && receiverBank.id !== 'wallet-paypal' && (!walletCrypto.trim() || !walletNetwork.trim())) {
+      setError('Please enter the crypto asset and network');
       return;
     }
     setError('');
@@ -162,6 +203,14 @@ export default function GenerateReceiptScreen() {
   async function handleConfirmPayment({ useCashback }: { useCashback: boolean }) {
     if (!receiverBank) return;
     const bankName = receiverBank.id === OTHERS_BANK_ID ? customBankName.trim() : receiverBank.name;
+    const metadata = isWallet
+      ? {
+          walletType: receiverBank.name,
+          email: walletEmail.trim() || undefined,
+          crypto: walletCrypto.trim() || undefined,
+          network: walletNetwork.trim() || undefined,
+        }
+      : undefined;
     setShowPaymentSheet(false);
     setSubmitting(true);
     try {
@@ -173,6 +222,7 @@ export default function GenerateReceiptScreen() {
         receiverAccountNumber: receiverAccount,
         receiverAccountName: receiverName,
         useCashback,
+        metadata,
       });
       setReceipt(result);
     } catch (err: any) {
@@ -221,7 +271,7 @@ export default function GenerateReceiptScreen() {
         <GlassCard style={styles.form}>
           <GlassInput label="Amount" value={amount} onChangeText={setAmount} keyboardType="numeric" leftIcon="cash-outline" placeholder="0.00" containerStyle={styles.field} />
           <GlassInput label="Sender Name" value={senderName} onChangeText={setSenderName} leftIcon="person-outline" placeholder="Full name" containerStyle={styles.field} />
-          <GlassInput label={senderAccountLabel} value={senderAccount} onChangeText={setSenderAccount} keyboardType="numeric" leftIcon="card-outline" placeholder="Account number (optional)" containerStyle={styles.field} />
+          <GlassInput label={senderAccountLabel} value={senderAccount} onChangeText={setSenderAccount} leftIcon="card-outline" placeholder={senderAccountPlaceholder} containerStyle={styles.field} />
 
           <Text style={[styles.label, { color: colors.secondaryText }]}>Receiver Bank</Text>
           <TouchableOpacity
@@ -257,15 +307,73 @@ export default function GenerateReceiptScreen() {
             />
           )}
 
-          <GlassInput
-            label="Receiver Account Number"
-            value={receiverAccount}
-            onChangeText={setReceiverAccount}
-            keyboardType="numeric"
-            leftIcon="wallet-outline"
-            placeholder="10 digit account number"
-            containerStyle={styles.field}
-          />
+          {isWallet && (
+            <>
+              <GlassInput
+                label="Receiver Name"
+                value={receiverName}
+                onChangeText={setReceiverName}
+                leftIcon="person-outline"
+                placeholder="Receiver full name"
+                containerStyle={styles.field}
+              />
+              {receiverBank?.id !== 'wallet-paypal' && (
+                <>
+                  <GlassInput
+                    label="Crypto"
+                    value={walletCrypto}
+                    onChangeText={setWalletCrypto}
+                    leftIcon="logo-bitcoin"
+                    placeholder="BTC, ETH, USDT..."
+                    containerStyle={styles.field}
+                  />
+                  <GlassInput
+                    label="Network"
+                    value={walletNetwork}
+                    onChangeText={setWalletNetwork}
+                    leftIcon="git-network-outline"
+                    placeholder="Network (e.g. TRC20, ERC20)"
+                    containerStyle={styles.field}
+                  />
+                </>
+              )}
+              <GlassInput
+                label={receiverAccountLabel}
+                value={receiverAccount}
+                onChangeText={setReceiverAccount}
+                leftIcon="wallet-outline"
+                placeholder={receiverAccountPlaceholder}
+                keyboardType={receiverBank?.id === 'wallet-paypal' ? 'email-address' : 'default'}
+                containerStyle={styles.field}
+              />
+              <GlassInput
+                label="Email (optional)"
+                value={walletEmail}
+                onChangeText={setWalletEmail}
+                keyboardType="email-address"
+                leftIcon="mail-outline"
+                placeholder="receiver@example.com"
+                containerStyle={styles.field}
+              />
+            </>
+          )}
+
+          {!isWallet && (
+            <>
+              <GlassInput
+                label={receiverAccountLabel}
+                value={receiverAccount}
+                onChangeText={setReceiverAccount}
+                keyboardType="numeric"
+                leftIcon="wallet-outline"
+                placeholder={receiverAccountPlaceholder}
+                containerStyle={styles.field}
+              />
+              {verifying ? <Text style={[styles.hint, { color: colors.secondaryText }]}>Verifying account…</Text> : null}
+              {verifyError ? <Text style={[styles.hint, { color: colors.error }]}>{verifyError}</Text> : null}
+              <GlassInput label="Receiver Account Name" value={receiverName} onChangeText={setReceiverName} leftIcon="person-outline" placeholder="Account holder name" containerStyle={styles.field} />
+            </>
+          )}
           {verifying ? <Text style={[styles.hint, { color: colors.secondaryText }]}>Verifying account…</Text> : null}
           {verifyError ? <Text style={[styles.hint, { color: colors.error }]}>{verifyError}</Text> : null}
           <GlassInput label="Receiver Account Name" value={receiverName} onChangeText={setReceiverName} leftIcon="person-outline" placeholder="Account holder name" containerStyle={styles.field} />
@@ -285,12 +393,15 @@ export default function GenerateReceiptScreen() {
 
                 <View style={[styles.divider, { backgroundColor: colors.divider }]} />
 
+                <DetailRow label={receipt.metadata?.walletType ? 'Wallet' : 'Bank'} value={receipt.receiverBankName} />
                 <DetailRow label="Reference" value={receipt.reference} />
                 <DetailRow label="Sender" value={receipt.senderName} />
                 {receipt.senderAccountNumber ? <DetailRow label="Sender Account" value={receipt.senderAccountNumber} /> : null}
-                <DetailRow label="Receiver Bank" value={receipt.receiverBankName} />
-                <DetailRow label="Receiver Account" value={receipt.receiverAccountNumber} />
+                <DetailRow label={receipt.metadata?.walletType ? 'Wallet Address / Email' : 'Receiver Account'} value={receipt.receiverAccountNumber} />
                 <DetailRow label="Receiver Name" value={receipt.receiverAccountName} />
+                {receipt.metadata?.crypto ? <DetailRow label="Crypto" value={String(receipt.metadata.crypto)} /> : null}
+                {receipt.metadata?.network ? <DetailRow label="Network" value={String(receipt.metadata.network)} /> : null}
+                {receipt.metadata?.email ? <DetailRow label="Email" value={String(receipt.metadata.email)} /> : null}
                 <DetailRow label="Date & Time" value={formatDate(receipt.createdAt)} />
 
                 <Text style={[styles.disclaimer, { color: colors.mutedText }]}>

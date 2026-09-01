@@ -475,6 +475,8 @@ export interface AdminPlatformConfig {
   announcements: string[];
   tutorials: AdminTutorial[];
   tips: string[];
+  telegramURL?: string;
+  appDownloadUrl?: string;
   airtimeProvider?: 'reloadly' | 'owlet' | string;
   dataProvider?: 'reloadly' | 'owlet' | string;
   billProvider?: 'reloadly' | string;
@@ -516,5 +518,6 @@ export interface ReceiptRecord {
   receiverAccountNumber: string;
   receiverAccountName: string;
   reference: string;
+  metadata?: Record<string, unknown>;
   createdAt: string;
 }

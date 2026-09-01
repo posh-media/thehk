@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@theme/useTheme';
 import { spacing, typography, borderRadius } from '@theme/tokens';
-import { Header, NotificationCard, SkeletonList, ErrorState } from '@components';
+import { Header, NotificationCard, SkeletonList, ErrorState, EmptyState } from '@components';
 import { Notification } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 import { useAuthStore } from '@stores/authStore';
@@ -28,8 +28,11 @@ export default function NotificationsScreen() {
 
   useEffect(() => {
     async function load() {
+      if (!user?.id) return;
+      setLoading(true);
+      setError('');
       try {
-        const data = await repositories.notification.getNotifications(user?.id || '');
+        const data = await repositories.notification.getNotifications(user.id);
         setNotifications(data);
       } catch (err: any) {
         setError(err.message || 'Failed to load notifications');
@@ -43,9 +46,10 @@ export default function NotificationsScreen() {
   const filtered = notifications.filter((n) => (filter === 'all' ? true : n.category === filter));
 
   async function handleMarkAllRead() {
+    if (!user?.id) return;
     setMarking(true);
     try {
-      await repositories.notification.markAllAsRead(user?.id || '');
+      await repositories.notification.markAllAsRead(user.id);
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     } catch (err: any) {
       setError(err.message || 'Failed to mark all as read');
@@ -71,7 +75,18 @@ export default function NotificationsScreen() {
       </View>
     );
   }
-  if (error) return <ErrorState message={error} onRetry={() => { setRetry((r) => r + 1); setLoading(true); setError(''); }} />;
+
+  if (error) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header title="Notifications" />
+        <ErrorState
+          message="Unable to load notifications. Please check your connection and try again."
+          onRetry={() => { setRetry((r) => r + 1); }}
+        />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
@@ -81,11 +96,11 @@ export default function NotificationsScreen() {
           rightAction={
             <TouchableOpacity
               activeOpacity={0.8}
-              disabled={marking}
+              disabled={marking || notifications.length === 0}
               onPress={handleMarkAllRead}
               style={[styles.markAll, { backgroundColor: colors.surface }]}
             >
-              <Ionicons name="checkmark-done-outline" size={22} color={marking ? colors.mutedText : colors.primary} />
+              <Ionicons name="checkmark-done-outline" size={22} color={marking || notifications.length === 0 ? colors.mutedText : colors.primary} />
             </TouchableOpacity>
           }
         />
@@ -110,7 +125,11 @@ export default function NotificationsScreen() {
         </View>
 
         {filtered.length === 0 ? (
-          <Text style={[styles.empty, { color: colors.secondaryText }]}>No notifications in this category.</Text>
+          <EmptyState
+            icon="notifications-outline"
+            title="Nothing yet"
+            description="You don't have any notifications yet."
+          />
         ) : (
           filtered.map((n) => <NotificationCard key={n.id} notification={n} onPress={() => handlePress(n.id)} />)
         )}
@@ -142,10 +161,5 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: typography.sizes.sm,
     fontWeight: typography.weights.semibold as any,
-  },
-  empty: {
-    fontSize: typography.sizes.base,
-    textAlign: 'center',
-    marginTop: spacing.xl,
   },
 });

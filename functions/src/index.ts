@@ -906,6 +906,7 @@ export const generateReceiptFn = functions
         receiverBankName: String(data?.receiverBankName || ''),
         receiverAccountNumber: String(data?.receiverAccountNumber || ''),
         receiverAccountName: String(data?.receiverAccountName || ''),
+        metadata: data?.metadata ? (data.metadata as Record<string, unknown>) : undefined,
       });
       return { receipt };
     } catch (err) {
@@ -918,7 +919,7 @@ export const purchaseBankGenReceiptFn = functions
   .runWith(RUNTIME_OPTS)
   .https.onCall(async (data, context) => {
     const uid = requireAuth(context);
-    const { amount, senderName, senderAccountNumber, receiverBankName, receiverAccountNumber, receiverAccountName, useCashback } = data || {};
+    const { amount, senderName, senderAccountNumber, receiverBankName, receiverAccountNumber, receiverAccountName, useCashback, metadata } = data || {};
     if (!amount || !senderName || !receiverBankName || !receiverAccountNumber || !receiverAccountName) {
       throw new functions.https.HttpsError('invalid-argument', 'amount, senderName, receiverBankName, receiverAccountNumber and receiverAccountName are required.');
     }
@@ -932,6 +933,7 @@ export const purchaseBankGenReceiptFn = functions
         receiverAccountNumber: String(receiverAccountNumber),
         receiverAccountName: String(receiverAccountName),
         useCashback: Boolean(useCashback),
+        metadata: metadata ? (metadata as Record<string, unknown>) : undefined,
       });
       return { receipt };
     } catch (err) {

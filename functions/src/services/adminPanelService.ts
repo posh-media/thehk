@@ -25,6 +25,8 @@ const DEFAULT_CONFIG: AdminPlatformConfig = {
     'Share your referral link - you earn a reward once your friend funds their wallet for the first time.',
     'Always double-check the recipient details before confirming a payment.',
   ],
+  telegramURL: 'https://www.google.com',
+  appDownloadUrl: 'https://www.google.com',
   airtimeProvider: 'vtung',
   dataProvider: 'vtung',
   billProvider: 'reloadly',
@@ -34,7 +36,21 @@ const DEFAULT_CONFIG: AdminPlatformConfig = {
 
 export async function getPlatformConfig(): Promise<AdminPlatformConfig> {
   const snap = await CONFIG_REF.get();
-  if (snap.exists) return snap.data() as AdminPlatformConfig;
+  if (snap.exists) {
+    const data = snap.data() as AdminPlatformConfig;
+    const needsBackfill = !data.telegramURL || !data.appDownloadUrl;
+    if (needsBackfill) {
+      const merged = {
+        ...data,
+        telegramURL: data.telegramURL || DEFAULT_CONFIG.telegramURL,
+        appDownloadUrl: data.appDownloadUrl || DEFAULT_CONFIG.appDownloadUrl,
+        updatedAt: new Date().toISOString(),
+      };
+      await CONFIG_REF.set(merged, { merge: true });
+      return merged;
+    }
+    return data;
+  }
   await CONFIG_REF.set(DEFAULT_CONFIG);
   return DEFAULT_CONFIG;
 }

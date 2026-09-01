@@ -1,5 +1,6 @@
 export const bankLogoAssets: Record<string, number> = {
   opay: require('../../assets/images/bank-logos/opay.jpg'),
+  paycom: require('../../assets/images/bank-logos/opay.jpg'),
   'kuda-bank': require('../../assets/images/bank-logos/kuda.png'),
   'access-bank': require('../../assets/images/bank-logos/access-bank.png'),
   'guaranty-trust-bank': require('../../assets/images/bank-logos/gtbank.webp'),

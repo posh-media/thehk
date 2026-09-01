@@ -31,6 +31,10 @@ export function mapCallableError(err: any): Error {
     friendly = 'Please enter a valid amount for this payment.';
   } else if (message.includes('insufficient hkc and wallet balance')) {
     friendly = "You don't have enough HKC or NGN wallet balance to complete this payment. Please fund your wallet.";
+  } else if (message.includes('wallet not found')) {
+    friendly = "Your wallet could not be loaded. Please try again or contact support.";
+  } else if (message.includes('insufficient balance')) {
+    friendly = "You don't have enough balance to complete this payment. Please fund your wallet.";
   } else if (message.includes('receipt generation failed') || message.includes('receipt') || message.includes('sender name') || message.includes('receiver')) {
     friendly = 'Could not generate the receipt. Please check the details and try again.';
   }

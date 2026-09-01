@@ -15,6 +15,7 @@ interface GenerateReceiptInput {
   receiverBankName: string;
   receiverAccountNumber: string;
   receiverAccountName: string;
+  metadata?: Record<string, unknown>;
 }
 
 interface PurchaseBankGenReceiptInput extends GenerateReceiptInput {
@@ -51,6 +52,7 @@ export async function generateReceipt(input: GenerateReceiptInput): Promise<Rece
     receiverAccountNumber: input.receiverAccountNumber,
     receiverAccountName: input.receiverAccountName,
     reference: generateReference('HK-RCT'),
+    metadata: input.metadata,
     createdAt: now,
   };
   await db.collection('receipts').doc(id).set(receipt);

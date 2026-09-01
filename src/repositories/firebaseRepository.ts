@@ -343,6 +343,7 @@ class FirebaseTransactionRepository implements TransactionRepository {
 
 class FirebaseNotificationRepository implements NotificationRepository {
   async getNotifications(userId: string): Promise<Notification[]> {
+    if (!userId) return [];
     const q = query(
       collection(db, 'users', userId, 'notifications'),
       orderBy('createdAt', 'desc'),
@@ -359,6 +360,7 @@ class FirebaseNotificationRepository implements NotificationRepository {
   }
 
   async markAllAsRead(userId: string): Promise<void> {
+    if (!userId) return;
     const q = query(
       collection(db, 'users', userId, 'notifications'),
       where('isRead', '==', false)
@@ -694,13 +696,27 @@ const walletEntries: Bank[] = [
   { id: 'wallet-binance', name: 'Binance', code: 'BINANCE', category: 'wallet', implemented: true, receiptTemplate: 'default', logoAsset: walletLogoAssets.binance },
 ];
 
+const BANK_DISPLAY_NAMES: Record<string, string> = {
+  paycom: 'OPay',
+};
+
+const BANK_LOGO_KEYS: Record<string, string> = {
+  paycom: 'opay',
+};
+
 class FirebaseBankRepository implements BankRepository {
   async getBanks(): Promise<Bank[]> {
-    const banks = (paystackBanks.banks || []).map((b) => ({
-      ...b,
-      logoAsset: b.slug ? bankLogoAssets[b.slug] : undefined,
-      receiptTemplate: b.receiptTemplate || 'default',
-    })) as Bank[];
+    const banks = (paystackBanks.banks || []).map((b) => {
+      const logoKey = (b.slug ? (BANK_LOGO_KEYS[b.slug] || b.slug) : b.id);
+      return {
+        ...b,
+        name: (b.slug ? (BANK_DISPLAY_NAMES[b.slug] || b.name) : b.name),
+        category: 'bank' as const,
+        implemented: true,
+        logoAsset: bankLogoAssets[logoKey] ? bankLogoAssets[logoKey] : undefined,
+        receiptTemplate: 'default',
+      } as Bank;
+    });
     return [...banks, ...walletEntries];
   }
 

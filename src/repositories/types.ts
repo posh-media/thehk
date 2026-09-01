@@ -151,6 +151,7 @@ export interface ReceiptRepository {
     receiverBankName: string;
     receiverAccountNumber: string;
     receiverAccountName: string;
+    metadata?: Record<string, unknown>;
   }): Promise<ReceiptRecord>;
   purchaseBankGenReceipt(data: {
     amount: number;
@@ -160,6 +161,7 @@ export interface ReceiptRepository {
     receiverAccountNumber: string;
     receiverAccountName: string;
     useCashback?: boolean;
+    metadata?: Record<string, unknown>;
   }): Promise<ReceiptRecord>;
   getReceipt(receiptId: string): Promise<ReceiptRecord>;
 }

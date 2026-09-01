@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Image, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@theme/useTheme';
@@ -8,6 +8,8 @@ import { GlassCard, GlassButton } from '@components';
 import { useAuthStore } from '@stores/authStore';
 import { useTheme as useThemeContext } from '@theme/ThemeProvider';
 import { showToast } from '@lib/toast';
+import { repositories } from '@repositories/mockRepository';
+import { AdminPlatformConfig } from '@/types/domain';
 
 const menuItems = [
   { label: 'Personal Information', icon: 'person-outline', route: '/profile/personal-info' },
@@ -23,6 +25,29 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, signOut } = useAuthStore();
   const { toggle, resolvedMode } = useThemeContext();
+  const [platform, setPlatform] = useState<AdminPlatformConfig | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    repositories.admin.getPlatformConfig()
+      .then((config) => { if (!cancelled) setPlatform(config); })
+      .catch(() => { if (!cancelled) setPlatform(null); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const openLink = (url?: string, label?: string) => {
+    if (!url || !url.trim().startsWith('http')) {
+      showToast(`${label || 'Link'} is not configured yet`);
+      return;
+    }
+    Linking.canOpenURL(url).then((supported) => {
+      if (supported) {
+        Linking.openURL(url);
+      } else {
+        showToast('Unable to open this link');
+      }
+    }).catch(() => showToast('Unable to open this link'));
+  };
 
   const sellerLabel = user?.isSeller ? 'Seller Dashboard' : 'Become a Seller';
   const rank = user?.rank || 'Chief';
@@ -78,6 +103,27 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={18} color={colors.mutedText} />
             </TouchableOpacity>
           ))}
+        </GlassCard>
+
+        <GlassCard style={styles.menuCard}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => openLink(platform?.telegramURL, 'Telegram link')}
+            style={[styles.menuItem, { borderBottomWidth: 1, borderBottomColor: colors.divider }]}
+          >
+            <Ionicons name="paper-plane-outline" size={20} color={colors.primary} style={styles.menuIcon} />
+            <Text style={[styles.menuLabel, { color: colors.primaryText }]}>Join us on Telegram</Text>
+            <Ionicons name="open-outline" size={18} color={colors.mutedText} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => openLink(platform?.appDownloadUrl, 'Download link')}
+            style={styles.menuItem}
+          >
+            <Ionicons name="download-outline" size={20} color={colors.primary} style={styles.menuIcon} />
+            <Text style={[styles.menuLabel, { color: colors.primaryText }]}>Download THE-HK App</Text>
+            <Ionicons name="open-outline" size={18} color={colors.mutedText} />
+          </TouchableOpacity>
         </GlassCard>
 
         <GlassButton

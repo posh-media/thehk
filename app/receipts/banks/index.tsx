@@ -8,7 +8,7 @@ import { Bank } from '@/types/domain';
 import { repositories } from '@repositories/mockRepository';
 
 const ORDERED_SLUGS = [
-  'opay',
+  'paycom',
   'kuda-bank',
   'united-bank-for-africa',
   'access-bank',
