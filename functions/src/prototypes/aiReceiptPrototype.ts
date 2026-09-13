@@ -3,7 +3,8 @@ import { GoogleGenAI, Modality } from '@google/genai';
 import { buildReceiptPrompt, PrototypeTransactionData } from './aiReceiptPrompt';
 
 const REGION = 'us-central1';
-const PROJECT_ID = process.env.GCLOUD_PROJECT || 'poshmedia-thehk';
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
+if (!PROJECT_ID) throw new Error('Google Cloud project is not available in the function runtime.');
 
 function requireAuth(context: functions.https.CallableContext): string {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'You must be logged in.');
@@ -48,7 +49,7 @@ export async function generateAiReceipt(input: AiReceiptPrototypeRequest): Promi
 
   const ai = new GoogleGenAI({
     vertexai: true,
-    project: requireEnvString('GOOGLE_CLOUD_PROJECT'),
+    project: PROJECT_ID,
     location: requireEnvString('GOOGLE_CLOUD_LOCATION'),
   });
 
