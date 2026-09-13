@@ -1,5 +1,4 @@
 import * as functions from 'firebase-functions';
-import { GoogleGenAI, Modality } from '@google/genai';
 import { buildReceiptPrompt, PrototypeTransactionData } from './aiReceiptPrompt';
 
 const REGION = 'us-central1';
@@ -46,6 +45,9 @@ export async function generateAiReceipt(input: AiReceiptPrototypeRequest): Promi
 
   // Strip a base64 data URL prefix if present so the SDK receives raw base64.
   const rawBase64 = input.referenceImageBase64.replace(/^data:[^;]+;base64,/, '');
+
+  // Lazy-load the Google Gen AI SDK to avoid deployment discovery timeouts.
+  const { GoogleGenAI, Modality } = await import('@google/genai');
 
   const ai = new GoogleGenAI({
     vertexai: true,
