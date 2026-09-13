@@ -954,3 +954,8 @@ export const getReceiptFn = functions
       throw new functions.https.HttpsError('failed-precondition', (err as Error).message);
     }
   });
+
+// --- Phase 6 research prototype: AI-generated receipts (isolated from Bank Gen) ---
+import { aiReceiptPrototypeFn } from './prototypes/aiReceiptPrototype';
+export { aiReceiptPrototypeFn };
+
