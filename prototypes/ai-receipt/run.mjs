@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import fetch from 'node-fetch';
 import { createWorker } from 'tesseract.js';
 
 const PROJECT_ID = 'poshmedia-thehk';
@@ -27,6 +28,7 @@ async function signIn() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password, returnSecureToken: true }),
+    timeout: 60000,
   });
 
   if (!res.ok) {
@@ -34,6 +36,7 @@ async function signIn() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, returnSecureToken: true }),
+      timeout: 60000,
     });
   }
 
@@ -141,6 +144,7 @@ async function generateReceipt(idToken, testCase) {
         aspectRatio: testCase.aspectRatio,
       },
     }),
+    timeout: 300000,
   });
 
   if (!res.ok) {
@@ -234,7 +238,7 @@ async function main() {
 
   const report = {
     model: 'gemini-3.1-flash-image',
-    api: 'Vertex AI',
+    api: 'Gemini Developer API',
     project: PROJECT_ID,
     referenceImage: IMAGE_PATH,
     testedAt: new Date().toISOString(),

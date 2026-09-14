@@ -50,3 +50,7 @@ functions/node_modules/
 
 # Firebase CLI debug logs
 firebase-debug.log
+
+# AI receipt prototype outputs and downloaded model data
+prototypes/ai-receipt/output/
+prototypes/ai-receipt/*.traineddata
